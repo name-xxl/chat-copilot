@@ -2,6 +2,9 @@
  * SELECTORS —— Soul 平台适配器（platform/soul.js）的选择器配置
  * （基于 2026-10 实际 DOM 勘察）页面改版只需改这里。
  * ===================================================================== */
+// 内置适配器生效的域名（拾取配置优先生效，见 platform.js 的适配器选择）
+export const SOUL_HOSTNAMES = ['home.soulapp.cn'];
+
 export const SELECTORS = {
   // 左侧会话列表（2026-10 实测：类名 .conv-list，直接位于左侧 section 下）
   convList: '.conv-list',

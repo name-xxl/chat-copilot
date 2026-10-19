@@ -45,6 +45,21 @@ export function updateChipOverflow() {
   wrap.classList.toggle('overflowing', hasMore);
 }
 
+export function renderRepickChip() {
+  const chatScroll = captureChatScroll();
+  const wrap = $bar('.chips');
+  if (!wrap) return;
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'chip repick';
+  chip.textContent = '重新定位（约 30 秒）';
+  chip.title = '打开拾取向导，重新教我识别这个页面';
+  chip.addEventListener('click', () => actions.startWizard?.());
+  wrap.appendChild(chip);
+  restoreChatScroll(chatScroll);
+  requestAnimationFrame(updateChipOverflow);
+}
+
 export function renderInsight(insight) {
   const el = $bar('.insight');
   if (!el) return;

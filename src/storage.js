@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   config: 'config',
   playerProfile: 'soul-ai-player-profile',
   memoryPrefix: 'soul-ai-memory:',
+  platformConfigPrefix: 'soul-ai-platform:', // + location.hostname = 拾取向导产出的适配器配置
 };
 
 export function safeGet(key) {

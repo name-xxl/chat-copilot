@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Soul AI 聊天助手
 // @namespace    soul-ai-chat
-// @version      1.8.0
+// @version      1.9.0
 // @description  Soul 网页版 AI 辅助回复：双卡 AI 提炼、主角档案、判断、JSON 长期记忆与候选建议，只填入不发送
-// @match        https://home.soulapp.cn/*
+// @match        *://*/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_registerMenuCommand
 // @connect      *
 // @run-at       document-idle
 // @noframes
@@ -302,6 +303,85 @@
     border-radius: 10px; padding: 9px; cursor: pointer; font-size: 13px; font-weight: 600;
   }
   .pop .save:hover { background: var(--accent-strong); }
+  .chip.repick {
+    color: var(--accent-deep); border-color: var(--accent-border); background: var(--accent-soft);
+  }
+  .chip.repick:hover { background: var(--accent-soft-hover); }
+`;
+  var WIZARD_CSS = `
+  .wizard-layer {
+    position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+    display: flex; align-items: center; justify-content: flex-end; padding: 16px;
+  }
+  .wizard-panel {
+    pointer-events: auto; width: 340px; max-width: calc(100vw - 32px);
+    max-height: 80vh; overflow-y: auto; padding: 16px 16px 14px; color: var(--fg);
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(22,55,48,.28);
+  }
+  .wizard-head { cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .wizard-title { font-size: 14px; font-weight: 700; color: var(--fg-strong); }
+  .wizard-progress { margin-top: 3px; font-size: 10.5px; letter-spacing: .04em; color: var(--fg-faint); }
+  .wizard-bar {
+    margin-top: 8px; height: 4px; border-radius: 999px; overflow: hidden;
+    background: var(--bg-soft);
+  }
+  .wizard-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .wizard-body { margin-top: 10px; font-size: 12px; line-height: 1.65; color: var(--fg-body); }
+  .wizard-status {
+    margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.55;
+    background: var(--bg-soft); border: 1px solid var(--border-soft); color: var(--fg-muted);
+  }
+  .wizard-status.ok { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-deep); }
+  .wizard-status.err { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+  .wizard-tip {
+    margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 11px; line-height: 1.6;
+    background: var(--watch-bg); border: 1px solid var(--watch-border); color: var(--watch-text);
+  }
+  .wizard-foot {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft);
+  }
+  .wizard-btn {
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg-body);
+    border-radius: 9px; padding: 7px 12px; font-size: 11.5px; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .wizard-btn:hover { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-deep); }
+  .wizard-btn:disabled { opacity: .55; cursor: default; }
+  .wizard-btn:disabled:hover { background: var(--bg-card); border-color: var(--border); color: var(--fg-body); }
+  .wizard-btn.primary { border: none; background: var(--accent); color: #fff; font-weight: 600; }
+  .wizard-btn.primary:hover { background: var(--accent-strong); }
+  .wizard-btn.primary:disabled { background: var(--accent); }
+  .wizard-btn.primary:disabled:hover { background: var(--accent); }
+  .wizard-option {
+    display: block; width: 100%; text-align: left; margin-top: 8px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset);
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .wizard-option:hover { border-color: var(--accent-focus); background: var(--accent-soft); }
+  .wizard-option b { display: block; margin-bottom: 2px; font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+  .wizard-option span { display: block; font-size: 11px; line-height: 1.5; color: var(--fg-muted); }
+  .wizard-report { display: flex; flex-direction: column; gap: 6px; }
+  .wizard-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 7px 10px;
+    border-radius: 9px; background: var(--bg-inset); border: 1px solid var(--border-soft);
+  }
+  .wizard-item .k { flex: none; font-size: 11px; color: var(--fg-faint); }
+  .wizard-item .v { flex: 1; min-width: 0; text-align: right; word-break: break-all; font-size: 11.5px; color: var(--fg-body); }
+  .wizard-item.ok .v { color: var(--accent-deep); }
+  .wizard-item.bad .v { color: var(--danger); }
+  .wizard-sugg { margin-top: 10px; }
+  .wizard-sugg-label { margin-bottom: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--fg-faint); }
+  .wizard-sugg-item {
+    margin-top: 5px; padding: 7px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.55;
+    background: var(--accent-soft); border: 1px solid var(--accent-border); color: var(--accent-deep);
+  }
+  .wizard-hover {
+    position: fixed; display: none; z-index: 2147483647; pointer-events: none;
+    border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+  .wizard-hover.show { display: block; }
 `;
 
   // src/ui/template.js
@@ -491,16 +571,24 @@
     CLICK_CANDIDATE_TTL: 15e3,
     // 点击意图候选的有效期
     // 接口
-    AI_REQUEST_TIMEOUT: 6e4
+    AI_REQUEST_TIMEOUT: 6e4,
+    // 拾取向导
+    WIZARD_HOVER_THROTTLE: 60,
+    // 向导悬停高亮的节流间隔
+    WIZARD_RELOAD_DELAY: 1200
+    // 保存拾取配置后的提示展示时长，随后刷新页面生效
   };
   var LOG_PREFIX = "[SoulAI]";
   var HOST_ELEMENT_ID = "soul-ai-bar-host";
+  var WIZARD_HOST_ID = "soul-ai-wizard-host";
 
   // src/storage.js
   var STORAGE_KEYS = {
     config: "config",
     playerProfile: "soul-ai-player-profile",
-    memoryPrefix: "soul-ai-memory:"
+    memoryPrefix: "soul-ai-memory:",
+    platformConfigPrefix: "soul-ai-platform:"
+    // + location.hostname = 拾取向导产出的适配器配置
   };
   function safeGet(key) {
     try {
@@ -691,6 +779,7 @@
   }
 
   // src/selectors.js
+  var SOUL_HOSTNAMES = ["home.soulapp.cn"];
   var SELECTORS = {
     // 左侧会话列表（2026-10 实测：类名 .conv-list，直接位于左侧 section 下）
     convList: ".conv-list",
@@ -714,9 +803,9 @@
   };
 
   // src/dom.js
-  function firstTextLine(el) {
-    if (!el) return "";
-    return (el.innerText || el.textContent || "").split("\n").map((s) => s.trim()).find(Boolean) || "";
+  function firstTextLine(el2) {
+    if (!el2) return "";
+    return (el2.innerText || el2.textContent || "").split("\n").map((s) => s.trim()).find(Boolean) || "";
   }
   function sameConversation(a, b) {
     if (!a || !b || !a.key || !b.key || a.key !== b.key) return false;
@@ -728,10 +817,91 @@
     }
     return a.element === b.element || a.name === b.name;
   }
-  function isVisible(el) {
-    return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+  function isVisible(el2) {
+    return !!(el2 && (el2.offsetWidth || el2.offsetHeight || el2.getClientRects().length));
   }
-  function findHostMount(composer) {
+  var SERIALIZE_LIMITS = {
+    ATTR_VALUE_MAX: 80,
+    ATTRS_MAX: 8,
+    CLASSES_MAX: 12,
+    PATH_DEPTH: 8,
+    PATH_CLASSES_MAX: 4,
+    TEXT_HEAD_MAX: 40
+  };
+  var SERIALIZE_ATTR_RE = /^(data-|aria-)/i;
+  var SERIALIZE_ATTR_NAMES = /* @__PURE__ */ new Set(["role", "type", "name", "placeholder", "contenteditable", "autocomplete", "dir", "title", "alt"]);
+  var SERIALIZE_STYLE_PROPS = ["justifyContent", "textAlign", "flexDirection", "alignSelf", "marginLeft", "marginRight"];
+  function serializeElement(el2) {
+    if (!el2 || el2.nodeType !== Node.ELEMENT_NODE) return null;
+    const attributes = [];
+    for (const attr of Array.from(el2.attributes || [])) {
+      const keep = SERIALIZE_ATTR_RE.test(attr.name) || SERIALIZE_ATTR_NAMES.has(attr.name.toLowerCase());
+      if (!keep || !attr.value || !attr.value.trim()) continue;
+      attributes.push({ name: attr.name.toLowerCase(), value: attr.value.trim().slice(0, SERIALIZE_LIMITS.ATTR_VALUE_MAX) });
+      if (attributes.length >= SERIALIZE_LIMITS.ATTRS_MAX) break;
+    }
+    const styles = {};
+    try {
+      const computed = getComputedStyle(el2);
+      for (const prop of SERIALIZE_STYLE_PROPS) styles[prop] = computed[prop];
+    } catch (e) {
+    }
+    const path = [];
+    let node = el2;
+    while (node && node.nodeType === Node.ELEMENT_NODE && path.length < SERIALIZE_LIMITS.PATH_DEPTH) {
+      const siblings = node.parentElement ? Array.prototype.slice.call(node.parentElement.children) : [];
+      path.push({
+        tag: node.tagName.toLowerCase(),
+        id: node.id || "",
+        classes: Array.from(node.classList || []).slice(0, SERIALIZE_LIMITS.PATH_CLASSES_MAX),
+        index: 1 + siblings.indexOf(node)
+      });
+      node = node.parentElement;
+    }
+    return {
+      tag: el2.tagName.toLowerCase(),
+      id: el2.id || "",
+      classes: Array.from(el2.classList || []).slice(0, SERIALIZE_LIMITS.CLASSES_MAX),
+      attributes,
+      styles,
+      path,
+      textHead: firstTextLine(el2).slice(0, SERIALIZE_LIMITS.TEXT_HEAD_MAX)
+    };
+  }
+  function countSelectorMatches(sel, root) {
+    try {
+      return (root || document).querySelectorAll(sel).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+  var MOUNT_LIMITS = {
+    DOCK_HEIGHT_RATIO: 4
+    // “底栏状”容器高度不超过输入区高度的倍数上限
+  };
+  function isDockStop(desc) {
+    if (!desc || !desc.lastInFlow) return false;
+    if (desc.position === "fixed" || desc.position === "sticky") return false;
+    return desc.heightRatio > 0 && desc.heightRatio <= MOUNT_LIMITS.DOCK_HEIGHT_RATIO;
+  }
+  function isLastInFlowChild(el2) {
+    let sib = el2.nextElementSibling;
+    while (sib) {
+      if (isVisible(sib) && !["fixed", "absolute"].includes(getComputedStyle(sib).position)) return false;
+      sib = sib.nextElementSibling;
+    }
+    return true;
+  }
+  function dockStopDesc(el2, composer) {
+    const elH = el2.getBoundingClientRect().height;
+    const composerH = composer.getBoundingClientRect().height;
+    return {
+      position: getComputedStyle(el2).position,
+      heightRatio: composerH > 0 ? elH / composerH : 0,
+      lastInFlow: isLastInFlowChild(el2)
+    };
+  }
+  function legacyHostMount(composer) {
     let anchor = composer;
     let parent = anchor.parentElement;
     while (parent && parent !== document.body) {
@@ -743,6 +913,29 @@
       parent = parent.parentElement;
     }
     return { parent: composer.parentElement, anchor: composer };
+  }
+  function inputAreaWrapper(el2) {
+    const base = el2 && el2.getBoundingClientRect().height;
+    if (!base) return el2;
+    let outer = el2;
+    let node = el2.parentElement;
+    while (node && node !== document.body) {
+      if (node.getBoundingClientRect().height > base * MOUNT_LIMITS.DOCK_HEIGHT_RATIO) break;
+      outer = node;
+      node = node.parentElement;
+    }
+    return outer;
+  }
+  function findHostMount(composer, opts) {
+    const legacy = legacyHostMount(composer);
+    if (!opts || !opts.dockEscape) return legacy;
+    let dock = null;
+    let node = composer.parentElement;
+    while (node && node !== document.body) {
+      if (isDockStop(dockStopDesc(node, composer))) dock = node;
+      node = node.parentElement;
+    }
+    return dock && dock.parentElement ? { parent: dock.parentElement, anchor: dock } : legacy;
   }
 
   // src/platform/soul.js
@@ -797,7 +990,7 @@
   }
   function findSidebarItemByName(list, name) {
     if (!list || !name) return null;
-    const byClass = Array.from(list.querySelectorAll(SELECTORS.convName)).find((el) => el.textContent.trim() === name);
+    const byClass = Array.from(list.querySelectorAll(SELECTORS.convName)).find((el2) => el2.textContent.trim() === name);
     if (byClass) return byClass;
     return Array.from(list.querySelectorAll("button")).find((btn) => firstTextLine(btn) === name) || null;
   }
@@ -905,10 +1098,10 @@
   function findComposer() {
     const input = Array.from(document.querySelectorAll(SELECTORS.inputBox)).find(isVisible);
     if (!input) return null;
-    let el = input;
-    while (el && el !== document.body) {
-      if (el.querySelector(SELECTORS.sendButton)) return el;
-      el = el.parentElement;
+    let el2 = input;
+    while (el2 && el2 !== document.body) {
+      if (el2.querySelector(SELECTORS.sendButton)) return el2;
+      el2 = el2.parentElement;
     }
     return null;
   }
@@ -927,8 +1120,394 @@
     };
   }
 
+  // src/platform/custom.js
+  var CUSTOM_LIMITS = {
+    NAME_MAX_CHARS: 30,
+    // 会话/对方昵称
+    FALLBACK_TEXT_MAX_CHARS: 60,
+    // 无法识别文本载体时的兜底文本
+    PEER_PROFILE_MAX_CHARS: 1200
+    // 资料卡文本
+  };
+  var STABLE_ID_ATTRS = ["data-conv-id", "data-conversation-id", "data-user-id", "data-uid", "data-id", "data-key"];
+  var EMPTY_INFO = { key: "", name: "", reliable: false, element: null };
+  function safeMatches(el2, sel) {
+    if (!el2 || !sel) return false;
+    try {
+      return el2.matches(sel);
+    } catch (e) {
+      return false;
+    }
+  }
+  function stableKeyFromNode2(node) {
+    for (const attr of STABLE_ID_ATTRS) {
+      const value = node.getAttribute(attr);
+      if (value && value.trim()) return attr + ":" + value.trim();
+    }
+    if (safeMatches(node, "a[href]")) {
+      const href = (node.getAttribute("href") || "").trim();
+      if (href && href !== "#" && !/^javascript:/i.test(href)) return "href:" + href;
+    }
+    return node.id ? "dom-id:" + node.id : "";
+  }
+  function extractStableKey2(element) {
+    let node = element;
+    while (node && node !== document.body) {
+      const ownKey = stableKeyFromNode2(node);
+      if (ownKey) return ownKey;
+      if (node === element) {
+        for (const child of node.querySelectorAll(STABLE_ID_ATTRS.map((a) => "[" + a + "]").join(", ") + ", a[href]")) {
+          const childKey = stableKeyFromNode2(child);
+          if (childKey) return childKey;
+        }
+      }
+      node = node.parentElement;
+    }
+    return "";
+  }
+  function styleMatches(el2, rule) {
+    try {
+      return getComputedStyle(el2)[rule.prop] === rule.value;
+    } catch (e) {
+      return false;
+    }
+  }
+  function selfMatchOf(row, rule) {
+    if (!rule) return false;
+    return rule.kind === "selector" ? safeMatches(row, rule.selector) : styleMatches(row, rule);
+  }
+  function createCustomPlatform(config2) {
+    function pickFromChain(chain) {
+      if (!chain) return "";
+      for (const sel of chain) {
+        try {
+          if (document.querySelector(sel)) return sel;
+        } catch (e) {
+        }
+      }
+      return chain[0];
+    }
+    function chainQuery(chain, root) {
+      if (!chain) return null;
+      for (const sel of chain) {
+        try {
+          const el2 = (root || document).querySelector(sel);
+          if (el2) return el2;
+        } catch (e) {
+        }
+      }
+      return null;
+    }
+    function firstVisible(chain) {
+      if (!chain) return null;
+      for (const sel of chain) {
+        try {
+          const input = Array.from(document.querySelectorAll(sel)).find(isVisible);
+          if (input) return input;
+        } catch (e) {
+        }
+      }
+      return null;
+    }
+    function findMessageFlow3() {
+      return chainQuery(config2.messageFlow);
+    }
+    function activeEntry() {
+      if (!config2.identity.entry) return null;
+      let entries = [];
+      try {
+        entries = Array.from(document.querySelectorAll(pickFromChain(config2.identity.entry)));
+      } catch (e) {
+        return null;
+      }
+      const rule = config2.identity.activeMatch;
+      if (!rule) return null;
+      return entries.find((entry) => selfMatchOf(entry, rule)) || null;
+    }
+    function infoFromNode(node) {
+      const name = firstTextLine(node).slice(0, CUSTOM_LIMITS.NAME_MAX_CHARS);
+      const stableKey = extractStableKey2(node);
+      return { key: stableKey || "peer:" + name, name, reliable: !!stableKey, element: node };
+    }
+    function getConversationInfo3() {
+      const identity = config2.identity;
+      if (identity.mode === "url") {
+        return { key: "url:" + location.pathname + location.search, name: headerName(), reliable: true, element: null };
+      }
+      if (identity.mode === "header") {
+        const header = chainQuery(identity.header);
+        if (!header || !firstTextLine(header)) return EMPTY_INFO;
+        return infoFromNode(header);
+      }
+      const entry = activeEntry();
+      if (!entry || !firstTextLine(entry)) return EMPTY_INFO;
+      return infoFromNode(entry);
+    }
+    function headerName() {
+      const header = config2.identity.header ? chainQuery(config2.identity.header) : null;
+      return header ? firstTextLine(header).slice(0, CUSTOM_LIMITS.NAME_MAX_CHARS) : "";
+    }
+    function describeConversationItem3(target) {
+      if (config2.identity.mode !== "sidebar" || !config2.identity.entry) return null;
+      const entrySel = pickFromChain(config2.identity.entry);
+      let node = target;
+      while (node && node !== document.body) {
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          node = node.parentElement;
+          continue;
+        }
+        if (safeMatches(node, entrySel)) return infoFromNode(node);
+        node = node.parentElement;
+      }
+      return null;
+    }
+    function collectMessages3() {
+      const flow = findMessageFlow3();
+      if (!flow) return [];
+      const rows = flow.querySelectorAll(pickFromChain(config2.messageRow));
+      const occurrences = /* @__PURE__ */ Object.create(null);
+      const out = [];
+      rows.forEach((row) => {
+        const role = selfMatchOf(row, config2.selfMatch) ? "self" : "other";
+        let text = "";
+        if (config2.textBubble) {
+          for (const sel of config2.textBubble) {
+            const bubble = row.querySelector(sel);
+            if (bubble && bubble.innerText && bubble.innerText.trim()) {
+              text = bubble.innerText.trim();
+              break;
+            }
+          }
+        }
+        if (!text) {
+          if (row.querySelector("img")) text = "[图片]";
+          else if (row.innerText) text = row.innerText.trim().slice(0, CUSTOM_LIMITS.FALLBACK_TEXT_MAX_CHARS);
+        }
+        if (!text) return;
+        const baseId = role + ":" + hash(text).toString(36);
+        const occurrence = occurrences[baseId] || 0;
+        occurrences[baseId] = occurrence + 1;
+        out.push({ role, text, id: baseId + ":" + occurrence, el: row });
+      });
+      return out;
+    }
+    function collectPeerProfile3() {
+      const card = chainQuery(config2.peerCard);
+      if (!card) return "";
+      return (card.innerText || "").split("\n").map((s) => s.trim()).filter(Boolean).join("；").slice(0, CUSTOM_LIMITS.PEER_PROFILE_MAX_CHARS);
+    }
+    function peerCardName3() {
+      const card = chainQuery(config2.peerCard);
+      return card ? firstTextLine(card) : "";
+    }
+    function findComposer3() {
+      const input = firstVisible(config2.inputBox);
+      if (!input) return null;
+      if (config2.sendButton) {
+        const sendSel = pickFromChain(config2.sendButton);
+        let el2 = input;
+        while (el2 && el2 !== document.body) {
+          try {
+            if (el2.querySelector(sendSel)) return el2;
+          } catch (e) {
+            break;
+          }
+          el2 = el2.parentElement;
+        }
+      }
+      return inputAreaWrapper(input);
+    }
+    function checkStructure(flow) {
+      try {
+        return !!flow.querySelector(pickFromChain(config2.messageRow));
+      } catch (e) {
+        return false;
+      }
+    }
+    return {
+      id: "custom:" + config2.domain,
+      capabilities: config2.capabilities,
+      // 消费方按单字符串使用选择器（chat-monitor 的 matches / theme 的采样点定位）
+      selectors: {
+        get messageFlow() {
+          return pickFromChain(config2.messageFlow);
+        },
+        get messageRow() {
+          return pickFromChain(config2.messageRow);
+        },
+        get textBubble() {
+          return pickFromChain(config2.textBubble);
+        },
+        get inputBox() {
+          return pickFromChain(config2.inputBox);
+        },
+        get sendButton() {
+          return config2.sendButton ? pickFromChain(config2.sendButton) : null;
+        },
+        get peerCard() {
+          return pickFromChain(config2.peerCard);
+        },
+        get accentSample() {
+          return config2.accentSample ? pickFromChain(config2.accentSample) : null;
+        }
+      },
+      findMessageFlow: findMessageFlow3,
+      collectMessages: collectMessages3,
+      getConversationInfo: getConversationInfo3,
+      describeConversationItem: describeConversationItem3,
+      collectPeerProfile: collectPeerProfile3,
+      peerCardName: peerCardName3,
+      findComposer: findComposer3,
+      checkStructure
+    };
+  }
+
+  // src/platform/null.js
+  function createNullPlatform() {
+    return {
+      id: "null",
+      capabilities: { stableIdentity: false, roleDetection: false, peerProfile: false },
+      selectors: {
+        messageFlow: "",
+        messageRow: "",
+        textBubble: "",
+        inputBox: "",
+        sendButton: null,
+        peerCard: "",
+        accentSample: null
+      },
+      findMessageFlow: () => null,
+      collectMessages: () => [],
+      getConversationInfo: () => ({ key: "", name: "", reliable: false, element: null }),
+      describeConversationItem: () => null,
+      collectPeerProfile: () => "",
+      peerCardName: () => "",
+      findComposer: () => null
+    };
+  }
+
+  // src/platform-config.js
+  var PLATFORM_CONFIG_VERSION = 1;
+  var PLATFORM_CONFIG_LIMITS = {
+    CHAIN_MAX: 5,
+    // 每条 fallback 链的最长保留数
+    SELECTOR_MAX_LENGTH: 120,
+    DOMAIN_MAX_LENGTH: 100
+  };
+  var IDENTITY_MODES = ["sidebar", "header", "url"];
+  var STYLE_PROPS_ALLOWED = ["justifyContent", "textAlign", "flexDirection", "alignSelf", "marginLeft", "marginRight"];
+  var REQUIRED_CHAINS = ["messageFlow", "messageRow", "inputBox"];
+  var OPTIONAL_CHAINS = ["textBubble", "sendButton", "peerCard", "accentSample", "identityEntry", "identityHeader"];
+  function normalizeSelector(value) {
+    if (typeof value !== "string") return null;
+    const sel = value.trim();
+    if (!sel || sel.length > PLATFORM_CONFIG_LIMITS.SELECTOR_MAX_LENGTH) return null;
+    if (/[<>{}]/.test(sel)) return null;
+    return sel;
+  }
+  function normalizeChain(value, required) {
+    if (value === null || value === void 0) return required ? null : null;
+    if (!Array.isArray(value)) return null;
+    const seen = /* @__PURE__ */ new Set();
+    const chain = [];
+    for (const item of value) {
+      const sel = normalizeSelector(item);
+      if (!sel || seen.has(sel)) continue;
+      seen.add(sel);
+      chain.push(sel);
+      if (chain.length >= PLATFORM_CONFIG_LIMITS.CHAIN_MAX) break;
+    }
+    if (!chain.length) return null;
+    return chain;
+  }
+  function normalizeSelfMatch(value) {
+    if (!value || typeof value !== "object") return null;
+    if (value.kind === "selector") {
+      const selector = normalizeSelector(value.selector);
+      return selector ? { kind: "selector", selector } : null;
+    }
+    if (value.kind === "style") {
+      if (!STYLE_PROPS_ALLOWED.includes(value.prop)) return null;
+      if (typeof value.value !== "string" || !value.value.trim()) return null;
+      return { kind: "style", prop: value.prop, value: value.value.trim() };
+    }
+    return null;
+  }
+  function normalizeDomain(value) {
+    if (typeof value !== "string") return null;
+    const domain = value.trim().toLowerCase();
+    if (!domain || domain.length > PLATFORM_CONFIG_LIMITS.DOMAIN_MAX_LENGTH) return null;
+    if (!/^[a-z0-9.-]+(?::\d+)?$/.test(domain)) return null;
+    return domain;
+  }
+  function normalizePlatformConfig(raw, expectedDomain) {
+    if (!raw || typeof raw !== "object") return null;
+    if (raw.version !== PLATFORM_CONFIG_VERSION) return null;
+    const domain = normalizeDomain(raw.domain);
+    if (!domain) return null;
+    if (expectedDomain && domain !== expectedDomain.trim().toLowerCase()) return null;
+    const config2 = { version: PLATFORM_CONFIG_VERSION, domain };
+    for (const field of REQUIRED_CHAINS) {
+      const chain = normalizeChain(raw[field], true);
+      if (!chain) return null;
+      config2[field] = chain;
+    }
+    for (const field of OPTIONAL_CHAINS) {
+      const chain = normalizeChain(raw[field], false);
+      config2[field] = chain || null;
+    }
+    config2.selfMatch = normalizeSelfMatch(raw.selfMatch);
+    const identity = raw.identity && typeof raw.identity === "object" ? raw.identity : null;
+    const mode = identity && IDENTITY_MODES.includes(identity.mode) ? identity.mode : null;
+    if (!mode) return null;
+    config2.identity = { mode };
+    if (mode === "sidebar") {
+      config2.identity.entry = normalizeChain(identity.entry, true);
+      config2.identity.activeMatch = normalizeSelfMatch(identity.activeMatch);
+      if (!config2.identity.entry) return null;
+    }
+    if (mode === "header") {
+      config2.identity.header = normalizeChain(identity.header, true);
+      if (!config2.identity.header) return null;
+    }
+    const caps = raw.capabilities && typeof raw.capabilities === "object" ? raw.capabilities : {};
+    config2.capabilities = {
+      stableIdentity: !!caps.stableIdentity,
+      roleDetection: !!caps.roleDetection,
+      peerProfile: !!caps.peerProfile
+    };
+    return config2;
+  }
+  function deriveCapabilities(config2) {
+    if (!config2 || typeof config2 !== "object") {
+      return { stableIdentity: false, roleDetection: false, peerProfile: false };
+    }
+    return {
+      stableIdentity: config2.identity.mode === "url" || config2.identity.mode === "sidebar" && !!config2.identity.activeMatch,
+      roleDetection: !!config2.selfMatch,
+      peerProfile: !!config2.peerCard
+    };
+  }
+
   // src/platform.js
-  var adapter = createSoulPlatform();
+  function currentHostname() {
+    return typeof location === "undefined" ? "" : location.hostname;
+  }
+  function loadCustomConfig(hostname2) {
+    if (!hostname2) return null;
+    try {
+      const raw = safeGet(STORAGE_KEYS.platformConfigPrefix + hostname2);
+      if (!raw) return null;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return normalizePlatformConfig(parsed, hostname2);
+    } catch (e) {
+      return null;
+    }
+  }
+  var hostname = currentHostname();
+  var customConfig = loadCustomConfig(hostname);
+  var adapter = customConfig ? createCustomPlatform(customConfig) : SOUL_HOSTNAMES.includes(hostname) ? createSoulPlatform() : createNullPlatform();
+  var adapterId = adapter.id;
   var capabilities = adapter.capabilities;
   var selectors = adapter.selectors;
   var findMessageFlow2 = adapter.findMessageFlow;
@@ -938,14 +1517,33 @@
   var collectPeerProfile2 = adapter.collectPeerProfile;
   var peerCardName2 = adapter.peerCardName;
   var findComposer2 = adapter.findComposer;
+  function hasCustomConfig() {
+    return !!customConfig;
+  }
+  function savePlatformConfig(rawConfig) {
+    const normalized = normalizePlatformConfig(rawConfig, currentHostname());
+    if (!normalized) return false;
+    return safeSet(STORAGE_KEYS.platformConfigPrefix + normalized.domain, normalized);
+  }
+  function clearPlatformConfig(domain) {
+    return safeDelete(STORAGE_KEYS.platformConfigPrefix + (domain || currentHostname()));
+  }
   function composerInput(composer) {
-    if (!composer) return null;
+    if (!composer || !selectors.inputBox) return null;
     return Array.from(composer.querySelectorAll(selectors.inputBox)).find(isVisible) || null;
   }
   function setInputText(text, composer) {
     const input = composerInput(composer || findComposer2());
     if (!input) return false;
     input.focus();
+    const tag = input.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT") {
+      const proto = tag === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+      setter.call(input, text);
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+      return true;
+    }
     const sel = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(input);
@@ -962,20 +1560,20 @@
     return setInputText(text);
   }
   function findChatScroller() {
-    let el = findMessageFlow2();
-    while (el && el !== document.body) {
-      const overflow = getComputedStyle(el).overflowY;
-      if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight + 1) return el;
-      el = el.parentElement;
+    let el2 = findMessageFlow2();
+    while (el2 && el2 !== document.body) {
+      const overflow = getComputedStyle(el2).overflowY;
+      if ((overflow === "auto" || overflow === "scroll") && el2.scrollHeight > el2.clientHeight + 1) return el2;
+      el2 = el2.parentElement;
     }
     return null;
   }
   function captureChatScroll() {
-    const el = findChatScroller();
-    if (!el) return null;
+    const el2 = findChatScroller();
+    if (!el2) return null;
     return {
-      el,
-      pinned: el.scrollHeight - el.scrollTop - el.clientHeight < 120
+      el: el2,
+      pinned: el2.scrollHeight - el2.scrollTop - el2.clientHeight < 120
     };
   }
   function restoreChatScroll(state2) {
@@ -986,9 +1584,14 @@
   }
   var structureBroken = false;
   function checkHealth() {
-    const ok = !findComposer2() || !!findMessageFlow2();
-    structureBroken = !ok;
-    return { ok, failed: ok ? [] : ["messageFlow"] };
+    const failed = [];
+    if (findComposer2()) {
+      const flow = findMessageFlow2();
+      if (!flow) failed.push("messageFlow");
+      else if (typeof adapter.checkStructure === "function" && !adapter.checkStructure(flow)) failed.push("messageRow");
+    }
+    structureBroken = failed.length > 0;
+    return { ok: failed.length === 0, failed };
   }
   function isStructureBroken() {
     return structureBroken;
@@ -1026,22 +1629,36 @@
     const hasMore = wrap.scrollWidth > wrap.clientWidth + 4 && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 4;
     wrap.classList.toggle("overflowing", hasMore);
   }
+  function renderRepickChip() {
+    const chatScroll = captureChatScroll();
+    const wrap = $bar(".chips");
+    if (!wrap) return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip repick";
+    chip.textContent = "重新定位（约 30 秒）";
+    chip.title = "打开拾取向导，重新教我识别这个页面";
+    chip.addEventListener("click", () => actions.startWizard?.());
+    wrap.appendChild(chip);
+    restoreChatScroll(chatScroll);
+    requestAnimationFrame(updateChipOverflow);
+  }
   function renderInsight(insight) {
-    const el = $bar(".insight");
-    if (!el) return;
+    const el2 = $bar(".insight");
+    if (!el2) return;
     if (!insight || !config.insightEnabled) {
-      el.className = "insight" + (isCollapsed() ? " hidden" : "");
-      el.textContent = "";
-      el.removeAttribute("title");
+      el2.className = "insight" + (isCollapsed() ? " hidden" : "");
+      el2.textContent = "";
+      el2.removeAttribute("title");
       return;
     }
     const confidence = insight.confidence > 0 ? "把握 " + Math.round(insight.confidence * 100) + "%" : "";
     const parts = ["风险 " + insight.risk + "/9 " + riskLabel(insight.risk)];
     if (insight.intent !== "信息不足") parts.push(insight.intent);
     if (insight.nextStep !== "信息不足") parts.push(insight.nextStep);
-    el.className = "insight show " + riskClass(insight.risk) + (isCollapsed() ? " hidden" : "");
-    el.textContent = parts.join(" · ");
-    el.title = [
+    el2.className = "insight show " + riskClass(insight.risk) + (isCollapsed() ? " hidden" : "");
+    el2.textContent = parts.join(" · ");
+    el2.title = [
       insight.reason ? "判断依据：" + insight.reason : "",
       "对方需要：" + insight.needs,
       "是否给实质：" + insight.replyTiming,
@@ -1238,6 +1855,17 @@
   var DARK_LUMINANCE = 0.35;
   var ACCENT_MIN_SPREAD = 24;
   var DEFAULT_ACCENT = { r: 47, g: 158, b: 143 };
+  var NEUTRAL_FALLBACK_ACCENT = { r: 125, g: 143, b: 163 };
+  var THEME_LIMITS = {
+    ACCENT_DEEP_MAX_DEPTH: 6,
+    // 主色深采样的最大后代深度
+    ACCENT_DEEP_MAX_NODES: 60,
+    // 主色深采样的最大遍历节点数
+    SURFACE_SPREAD_MAX: 24,
+    // 表面色 RGB 极差超过此视为彩色面板，不采纳
+    SURFACE_LUMINANCE_MAX: 0.55
+    // 表面色过亮（实为浅色页）不采纳
+  };
   function parseHex(value) {
     const m = /^#([0-9a-f]{6})$/i.exec((value || "").trim());
     if (!m) return null;
@@ -1284,11 +1912,11 @@
     };
   }
   function sampleHostBackground() {
-    let el = findMessageFlow2();
-    while (el && el !== document.documentElement) {
-      const color = parseColor(getComputedStyle(el).backgroundColor);
+    let el2 = findMessageFlow2();
+    while (el2 && el2 !== document.documentElement) {
+      const color = parseColor(getComputedStyle(el2).backgroundColor);
       if (color && color.a >= 0.5) return color;
-      el = el.parentElement;
+      el2 = el2.parentElement;
     }
     return null;
   }
@@ -1296,14 +1924,50 @@
     const background = sampleHostBackground();
     return !!background && luminance(background) < DARK_LUMINANCE;
   }
-  function extractAccentColor() {
-    const composer = findComposer2();
-    const button = composer && composer.querySelector(selectors.sendButton);
-    if (!button || !isVisible(button)) return null;
-    const color = parseColor(getComputedStyle(button).backgroundColor);
+  function extractAccentFrom(el2) {
+    if (!el2 || !isVisible(el2)) return null;
+    const computed = getComputedStyle(el2);
+    const color = parseColor(computed.backgroundColor) || (typeof SVGElement !== "undefined" && el2 instanceof SVGElement ? parseColor(computed.fill) : null);
     if (!color || color.a < 0.5) return null;
     if (Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b) < ACCENT_MIN_SPREAD) return null;
     return color;
+  }
+  function extractAccentDeep(rootEl) {
+    const own = extractAccentFrom(rootEl);
+    if (own) return own;
+    if (!rootEl) return null;
+    let frontier = Array.from(rootEl.children);
+    let depth = 1;
+    let seen = 0;
+    while (frontier.length && depth <= THEME_LIMITS.ACCENT_DEEP_MAX_DEPTH && seen < THEME_LIMITS.ACCENT_DEEP_MAX_NODES) {
+      const next = [];
+      for (const el2 of frontier) {
+        if (++seen > THEME_LIMITS.ACCENT_DEEP_MAX_NODES) break;
+        const color = extractAccentFrom(el2);
+        if (color) return color;
+        next.push(...el2.children);
+      }
+      frontier = next;
+      depth++;
+    }
+    return null;
+  }
+  function extractAccentColor() {
+    if (selectors.sendButton) {
+      const composer = findComposer2();
+      const button = composer && composer.querySelector(selectors.sendButton);
+      const color = extractAccentDeep(button);
+      if (color) return color;
+    }
+    if (selectors.accentSample) {
+      const color = extractAccentDeep(document.querySelector(selectors.accentSample));
+      if (color) return color;
+    }
+    if (isCustomAdapter()) {
+      const color = extractAccentDeep(findComposer2());
+      if (color) return color;
+    }
+    return null;
   }
   var NEUTRAL_LIGHT = {
     "--bg-bar": "rgba(255,255,255,.97)",
@@ -1347,14 +2011,37 @@
     "--watch-border": "rgba(217,179,106,.34)",
     "--watch-text": "#d9b36a"
   };
+  function deriveSurfaceDarkTokens(bg) {
+    if (!bg || ![bg.r, bg.g, bg.b].every(Number.isFinite)) return null;
+    if (Math.max(bg.r, bg.g, bg.b) - Math.min(bg.r, bg.g, bg.b) > THEME_LIMITS.SURFACE_SPREAD_MAX) return null;
+    if (luminance(bg) > THEME_LIMITS.SURFACE_LUMINANCE_MAX) return null;
+    const base = { r: Math.round(bg.r), g: Math.round(bg.g), b: Math.round(bg.b) };
+    const lift = (ratio) => mixColor(base, 255, ratio);
+    return {
+      "--bg-bar": rgba(base, 0.97),
+      "--bg-card": rgb(base),
+      "--bg-soft": rgb(lift(0.06)),
+      "--bg-inset": rgb(lift(0.03)),
+      "--border": rgb(lift(0.14)),
+      "--border-soft": rgb(lift(0.08))
+    };
+  }
+  function isCustomAdapter() {
+    return typeof adapterId === "string" && adapterId.startsWith("custom:");
+  }
   function applyTheme() {
     const host = ui.host;
     if (!host || !host.isConnected) return;
     const mode = config.themeMode === "light" || config.themeMode === "dark" ? config.themeMode : "auto";
     const dark = mode === "auto" ? detectDarkMode() : mode === "dark";
     const tokens = Object.assign({}, dark ? NEUTRAL_DARK : NEUTRAL_LIGHT);
+    if (dark && isCustomAdapter()) {
+      const surface = deriveSurfaceDarkTokens(sampleHostBackground());
+      if (surface) Object.assign(tokens, surface);
+    }
     const custom = parseHex(config.customAccent);
-    const accent = custom || extractAccentColor() || DEFAULT_ACCENT;
+    const fallback = isCustomAdapter() ? NEUTRAL_FALLBACK_ACCENT : DEFAULT_ACCENT;
+    const accent = custom || extractAccentColor() || fallback;
     Object.assign(tokens, buildAccentFamily(accent, dark));
     for (const [name, value] of Object.entries(tokens)) {
       host.style.setProperty(name, value);
@@ -1377,10 +2064,10 @@
     showSettingsError("");
   }
   function showSettingsError(text) {
-    const el = $bar(".form-error");
-    if (!el) return;
-    el.textContent = text;
-    el.classList.toggle("show", !!text);
+    const el2 = $bar(".form-error");
+    if (!el2) return;
+    el2.textContent = text;
+    el2.classList.toggle("show", !!text);
   }
   function onSaveSettings() {
     const next = Object.assign({}, config);
@@ -1710,18 +2397,18 @@
     });
   }
   function setRoleStatus(text, isError) {
-    const el = $bar(".role-status");
-    if (!el) return;
-    el.innerHTML = "";
-    el.textContent = text;
-    el.classList.remove("role-hidden");
-    el.classList.toggle("error", !!isError);
+    const el2 = $bar(".role-status");
+    if (!el2) return;
+    el2.innerHTML = "";
+    el2.textContent = text;
+    el2.classList.remove("role-hidden");
+    el2.classList.toggle("error", !!isError);
     if (isError) {
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "role-retry";
       retry.textContent = "重试";
-      el.appendChild(retry);
+      el2.appendChild(retry);
     }
   }
   function renderCharacterBasics() {
@@ -1816,11 +2503,11 @@
     setPlayerStatus("");
   }
   function setPlayerStatus(text, isError) {
-    const el = $bar(".player-status");
-    if (!el) return;
-    el.textContent = text;
-    el.classList.toggle("role-hidden", !text);
-    el.classList.toggle("error", !!isError);
+    const el2 = $bar(".player-status");
+    if (!el2) return;
+    el2.textContent = text;
+    el2.classList.toggle("role-hidden", !text);
+    el2.classList.toggle("error", !!isError);
   }
   function readPlayerForm() {
     const value = (key) => {
@@ -1945,7 +2632,7 @@
     host.id = HOST_ELEMENT_ID;
     const root = host.attachShadow({ mode: "open" });
     root.innerHTML = buildRootHtml();
-    const mountPoint = findHostMount(composer);
+    const mountPoint = findHostMount(composer, { dockEscape: adapterId.startsWith("custom:") });
     if (!mountPoint.parent) return;
     host.style.cssText = "display:block;width:100%;min-width:0;flex:none;align-self:stretch;margin:0 0 8px;";
     mountPoint.parent.insertBefore(host, mountPoint.anchor);
@@ -2012,6 +2699,262 @@
     if (ui.host) ui.host.remove();
     ui.host = null;
     ui.root = null;
+  }
+
+  // src/ui/wizard.js
+  var wiz = {
+    host: null,
+    root: null,
+    handlers: null,
+    listeners: [],
+    hoverRaf: 0,
+    hoverTs: 0
+  };
+  function $w(sel) {
+    return wiz.root && wiz.root.querySelector(sel);
+  }
+  function call(name, ...args) {
+    if (wiz.handlers && typeof wiz.handlers[name] === "function") wiz.handlers[name](...args);
+  }
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function buildWizardHtml() {
+    return `
+    <style>${UI_CSS}${WIZARD_CSS}</style>
+    <div class="wizard-layer">
+      <div class="wizard-panel" role="dialog" aria-label="拾取向导">
+        <div class="wizard-head">
+          <div class="wizard-title"></div>
+          <div class="wizard-progress"></div>
+          <div class="wizard-bar"><i></i></div>
+        </div>
+        <div class="wizard-body"></div>
+        <div class="wizard-foot"></div>
+      </div>
+    </div>
+    <div class="wizard-hover"></div>`;
+  }
+  function inWizard(event) {
+    return !!(wiz.host && event.composedPath && event.composedPath().includes(wiz.host));
+  }
+  var DRAG_RESET_PROPS = ["position", "left", "top", "right", "margin"];
+  function attachDrag(panel, handle) {
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      const offsetX = event.clientX - rect.left;
+      const offsetY = event.clientY - rect.top;
+      panel.style.position = "fixed";
+      panel.style.right = "auto";
+      panel.style.margin = "0";
+      panel.style.left = Math.max(0, rect.left) + "px";
+      panel.style.top = Math.max(0, rect.top) + "px";
+      const move = (ev) => {
+        const left = Math.min(Math.max(ev.clientX - offsetX, 0), window.innerWidth - rect.width);
+        const top = Math.min(Math.max(ev.clientY - offsetY, 0), window.innerHeight - rect.height);
+        panel.style.left = Math.max(0, left) + "px";
+        panel.style.top = Math.max(0, top) + "px";
+      };
+      const up = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener("dblclick", () => {
+      DRAG_RESET_PROPS.forEach((prop) => panel.style.removeProperty(prop));
+    });
+  }
+  function onDocClick(event) {
+    if (!wiz.handlers) return;
+    if (inWizard(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    call("onPick", event.target);
+  }
+  function onDocMove(event) {
+    if (!wiz.root) return;
+    const now = Date.now();
+    if (now - wiz.hoverTs < TIMING.WIZARD_HOVER_THROTTLE) return;
+    wiz.hoverTs = now;
+    const inPanel = inWizard(event);
+    const target = event.target;
+    if (wiz.hoverRaf) return;
+    wiz.hoverRaf = requestAnimationFrame(() => {
+      wiz.hoverRaf = 0;
+      renderHover(inPanel ? null : target);
+    });
+  }
+  function renderHover(target) {
+    const box = $w(".wizard-hover");
+    if (!box) return;
+    const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+    if (!rect || !rect.width && !rect.height) {
+      box.classList.remove("show");
+      return;
+    }
+    box.style.left = rect.left + "px";
+    box.style.top = rect.top + "px";
+    box.style.width = rect.width + "px";
+    box.style.height = rect.height + "px";
+    box.classList.add("show");
+  }
+  function onDocKeydown(event) {
+    if (event.key !== "Escape" || !wiz.handlers) return;
+    event.preventDefault();
+    event.stopPropagation();
+    call("onCancel");
+  }
+  function attachDocListeners() {
+    wiz.listeners = [
+      ["click", onDocClick, { capture: true }],
+      ["mousemove", onDocMove, { capture: true, passive: true }],
+      ["keydown", onDocKeydown, { capture: true }]
+    ];
+    wiz.listeners.forEach(([type, fn, opts]) => document.addEventListener(type, fn, opts));
+  }
+  function detachDocListeners() {
+    wiz.listeners.forEach(([type, fn, opts]) => document.removeEventListener(type, fn, opts));
+    wiz.listeners = [];
+    if (wiz.hoverRaf) {
+      cancelAnimationFrame(wiz.hoverRaf);
+      wiz.hoverRaf = 0;
+    }
+  }
+  function mountWizard(handlers) {
+    if (isWizardOpen()) unmountWizard();
+    const host = document.createElement("div");
+    host.id = WIZARD_HOST_ID;
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = buildWizardHtml();
+    document.body.appendChild(host);
+    const panel = root.querySelector(".wizard-panel");
+    const head = root.querySelector(".wizard-head");
+    if (panel && head) attachDrag(panel, head);
+    wiz.host = host;
+    wiz.root = root;
+    wiz.handlers = handlers || {};
+    attachDocListeners();
+  }
+  function unmountWizard() {
+    detachDocListeners();
+    if (wiz.host) wiz.host.remove();
+    wiz.host = null;
+    wiz.root = null;
+    wiz.handlers = null;
+  }
+  function isWizardOpen() {
+    return !!(wiz.host && wiz.host.isConnected);
+  }
+  function renderHeader(view) {
+    const title = $w(".wizard-title");
+    if (title) title.textContent = view.title || "";
+    const progress = $w(".wizard-progress");
+    const bar = $w(".wizard-bar");
+    const fill = $w(".wizard-bar i");
+    const total = view.progress ? view.progress.total : 0;
+    const current = view.progress ? view.progress.current : 0;
+    const has = Number.isFinite(total) && total > 0;
+    if (progress) progress.textContent = has ? `第 ${Math.max(1, current)} / ${total} 步` : "";
+    if (bar) bar.style.display = has ? "" : "none";
+    if (fill) fill.style.width = has ? Math.min(100, Math.round(current / total * 100)) + "%" : "0";
+  }
+  function normalizeStatus(status) {
+    if (!status) return null;
+    if (typeof status === "string") return { text: status, ok: null };
+    return status.text ? { text: status.text, ok: status.ok } : null;
+  }
+  function appendStatus(body, status) {
+    const norm = normalizeStatus(status);
+    if (!norm) return;
+    const cls = norm.ok === true ? " ok" : norm.ok === false ? " err" : "";
+    body.appendChild(el("div", "wizard-status" + cls, norm.text));
+  }
+  function footerButton(label, handler, cls) {
+    const btn = el("button", "wizard-btn" + (cls ? " " + cls : ""), label);
+    btn.type = "button";
+    btn.addEventListener("click", handler);
+    return btn;
+  }
+  function clearBody() {
+    const body = $w(".wizard-body");
+    const foot = $w(".wizard-foot");
+    if (body) body.innerHTML = "";
+    if (foot) foot.innerHTML = "";
+    return { body, foot };
+  }
+  function renderWizardStep(view) {
+    if (!wiz.root || !view) return;
+    renderHeader(view);
+    const { body, foot } = clearBody();
+    if (!body || !foot) return;
+    if (view.desc) body.appendChild(el("p", "", view.desc));
+    appendStatus(body, view.status);
+    if (view.tip) body.appendChild(el("div", "wizard-tip", view.tip));
+    if (view.canBack) foot.appendChild(footerButton("上一步", () => call("onBack")));
+    if (view.optional) foot.appendChild(footerButton("跳过此步", () => call("onSkip")));
+    foot.appendChild(footerButton("取消", () => call("onCancel")));
+  }
+  function renderWizardChoice(view) {
+    if (!wiz.root || !view) return;
+    renderHeader(view);
+    const { body, foot } = clearBody();
+    if (!body || !foot) return;
+    if (view.desc) body.appendChild(el("p", "", view.desc));
+    (view.options || []).forEach((option) => {
+      if (!option) return;
+      const btn = el("button", "wizard-option");
+      btn.type = "button";
+      btn.appendChild(el("b", "", option.label || option.key));
+      if (option.desc) btn.appendChild(el("span", "", option.desc));
+      btn.addEventListener("click", () => call("onChooseIdentity", option.key));
+      body.appendChild(btn);
+    });
+    foot.appendChild(footerButton("取消", () => call("onCancel")));
+  }
+  function renderWizardReport(view) {
+    if (!wiz.root || !view) return;
+    renderHeader(view);
+    const { body, foot } = clearBody();
+    if (!body || !foot) return;
+    if (view.error) body.appendChild(el("div", "wizard-status err", view.error));
+    const report = el("div", "wizard-report");
+    (view.items || []).forEach((item) => {
+      if (!item) return;
+      const cls = item.ok === true ? " ok" : item.ok === false ? " bad" : "";
+      const row = el("div", "wizard-item" + cls);
+      row.appendChild(el("span", "k", item.label));
+      row.appendChild(el("span", "v", item.value == null || item.value === "" ? "—" : String(item.value)));
+      report.appendChild(row);
+    });
+    if (report.childNodes.length) body.appendChild(report);
+    if (Array.isArray(view.suggestions) && view.suggestions.length) {
+      const wrap = el("div", "wizard-sugg");
+      wrap.appendChild(el("div", "wizard-sugg-label", "自检建议预览"));
+      view.suggestions.forEach((text) => wrap.appendChild(el("div", "wizard-sugg-item", text)));
+      body.appendChild(wrap);
+    }
+    if (view.busy) {
+      body.appendChild(el("div", "wizard-status", "AI 自检中…"));
+    } else if (view.saved) {
+      body.appendChild(el("div", "wizard-status ok", "已保存，即将刷新页面生效"));
+    }
+    const disabled = !!view.busy || !!view.saved;
+    const save = footerButton("保存并启用", () => call("onSave"), "primary");
+    const restart = footerButton("重新拾取", () => call("onRestart"));
+    save.disabled = disabled;
+    restart.disabled = disabled;
+    foot.appendChild(save);
+    foot.appendChild(restart);
   }
 
   // src/ai-client.js
@@ -2795,23 +3738,27 @@
   }
   var clearDebounce = null;
   var unmountDebounce = null;
-  var structureBroken2 = false;
   var brokenStrikes = 0;
+  var brokenAnnounced = false;
   function watchStructureHealth() {
     const { ok } = checkHealth();
     if (ok) {
-      if (structureBroken2) loadSuggestions(false);
-      structureBroken2 = false;
+      if (brokenAnnounced) {
+        brokenAnnounced = false;
+        loadSuggestions(false);
+      }
       brokenStrikes = 0;
       return;
     }
-    if (structureBroken2) return;
+    if (brokenAnnounced) return;
     brokenStrikes++;
     if (brokenStrikes >= 2) {
-      structureBroken2 = true;
+      brokenAnnounced = true;
       logWarn("选择器健康检查未通过：聊天窗在而消息流缺失，页面结构可能已改版");
       cancelSuggestions();
-      renderChips(["页面结构已变化，建议功能暂时失效；刷新页面通常可恢复"], "err");
+      if (isWizardOpen()) return;
+      renderChips(["页面结构已变化，部分功能暂时失效"], "err");
+      renderRepickChip();
     }
   }
   function activateConversation(info) {
@@ -2967,6 +3914,652 @@
     return activated;
   }
 
+  // src/selector-gen.js
+  var SELECTOR_GEN_LIMITS = {
+    CHAIN_MAX: 5,
+    // fallback 链最长保留数
+    CANDIDATE_MAX: 24,
+    // 单个描述符生成的候选上限
+    SELECTOR_MAX_LENGTH: 120,
+    PATH_DEPTH: 6,
+    // 结构路径候选的最大层级
+    CLASS_COMBO_MAX: 3
+    // class 组合候选最多参与的 class 数
+  };
+  function isHashClass(name) {
+    if (name.length > 40) return true;
+    return /[0-9]/.test(name.replace(/[0-9]+$/, ""));
+  }
+  function escapeIdent(name) {
+    return name.replace(/[^a-zA-Z0-9_-]/g, (ch) => "\\" + ch);
+  }
+  function escapeAttrValue(value) {
+    return '"' + String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
+  function attrSelector(desc, attr, withTag) {
+    const sel = "[" + attr.name + "=" + escapeAttrValue(attr.value) + "]";
+    return withTag && desc.tag && desc.tag !== "*" ? desc.tag + sel : sel;
+  }
+  function buildPath(desc, depth) {
+    const levels = desc.path.slice(0, depth);
+    if (!levels.length) return null;
+    const parts = [];
+    for (let i = levels.length - 1; i >= 0; i--) {
+      const level = levels[i];
+      const classes = (level.classes || []).filter((c) => !isHashClass(c)).slice(0, 2);
+      let part = level.tag + classes.map((c) => "." + escapeIdent(c)).join("");
+      if (!part) part = level.tag;
+      if (i < levels.length - 1 && level.index > 0) part += ":nth-child(" + level.index + ")";
+      parts.push(part);
+    }
+    return parts.join(" > ");
+  }
+  function buildCandidates(desc) {
+    const out = [];
+    if (!desc || typeof desc !== "object") return out;
+    const attrs = Array.isArray(desc.attributes) ? desc.attributes : [];
+    const stableClasses = (Array.isArray(desc.classes) ? desc.classes : []).filter((c) => !isHashClass(c));
+    const hashClasses = (Array.isArray(desc.classes) ? desc.classes : []).filter(isHashClass);
+    for (const attr of attrs) {
+      if (!attr || typeof attr.name !== "string" || !attr.name.startsWith("data-")) continue;
+      if (typeof attr.value !== "string" || !attr.value.trim()) continue;
+      out.push(attrSelector(desc, attr, false));
+      out.push(attrSelector(desc, attr, true));
+    }
+    const semantic = /* @__PURE__ */ new Set(["role", "type", "name", "placeholder", "contenteditable", "autocomplete", "dir"]);
+    for (const attr of attrs) {
+      if (!attr || typeof attr.name !== "string") continue;
+      const isSemantic = semantic.has(attr.name) || attr.name.startsWith("aria-");
+      if (!isSemantic || typeof attr.value !== "string" || !attr.value.trim()) continue;
+      out.push(attrSelector(desc, attr, false));
+      out.push(attrSelector(desc, attr, true));
+    }
+    if (desc.id && !isHashClass(desc.id)) out.push("#" + escapeIdent(desc.id));
+    const ranked = stableClasses.concat(hashClasses);
+    for (let size = 1; size <= Math.min(SELECTOR_GEN_LIMITS.CLASS_COMBO_MAX, ranked.length); size++) {
+      out.push(ranked.slice(0, size).map((c) => "." + escapeIdent(c)).join(""));
+    }
+    if (stableClasses.length && desc.tag && desc.tag !== "*") {
+      out.push(desc.tag + "." + escapeIdent(stableClasses[0]));
+    }
+    const depth = Math.min(SELECTOR_GEN_LIMITS.PATH_DEPTH, (desc.path || []).length);
+    for (let d = 2; d <= depth; d++) {
+      const path = buildPath(desc, d);
+      if (path) out.push(path);
+    }
+    const seen = /* @__PURE__ */ new Set();
+    return out.filter((sel) => sel && typeof sel === "string").filter((sel) => {
+      if (seen.has(sel) || sel.length > SELECTOR_GEN_LIMITS.SELECTOR_MAX_LENGTH) return false;
+      seen.add(sel);
+      return true;
+    }).slice(0, SELECTOR_GEN_LIMITS.CANDIDATE_MAX);
+  }
+  function pickChain(descriptors, countFn, opts = {}) {
+    if (typeof countFn !== "function") return null;
+    if (!Array.isArray(descriptors) || !descriptors.length) return null;
+    const min = Number.isFinite(opts.min) ? opts.min : 1;
+    const max = Number.isFinite(opts.max) ? opts.max : Infinity;
+    const matchesFn = typeof opts.matchesFn === "function" ? opts.matchesFn : null;
+    const seen = /* @__PURE__ */ new Set();
+    const accepted = [];
+    const nearMisses = [];
+    for (const desc of descriptors) {
+      for (const candidate of buildCandidates(desc)) {
+        if (seen.has(candidate)) continue;
+        seen.add(candidate);
+        let count;
+        try {
+          count = countFn(candidate);
+        } catch (e) {
+          continue;
+        }
+        if (typeof count !== "number" || !Number.isFinite(count)) continue;
+        if (matchesFn && !matchesFn(candidate)) continue;
+        if (count >= min && count <= max) accepted.push(candidate);
+        else if (count >= min) nearMisses.push({ sel: candidate, count });
+      }
+    }
+    const chain = accepted.length ? accepted : nearMisses.sort((a, b) => a.count - b.count).map((item) => item.sel);
+    return chain.length ? chain.slice(0, SELECTOR_GEN_LIMITS.CHAIN_MAX) : null;
+  }
+
+  // src/role-diff.js
+  var ROLE_DIFF_LIMITS = {
+    MAX_EXAMPLES: 6
+    // 每侧最多参与差分的样例数
+  };
+  var ROLE_STYLE_PROPS = ["justifyContent", "textAlign", "flexDirection", "alignSelf", "marginLeft", "marginRight"];
+  function capExamples(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(Boolean).slice(0, ROLE_DIFF_LIMITS.MAX_EXAMPLES);
+  }
+  function featuresOf(desc) {
+    const features = /* @__PURE__ */ new Set();
+    if (!desc || typeof desc !== "object") return features;
+    if (desc.tag) features.add("tag:" + desc.tag);
+    for (const name of Array.isArray(desc.classes) ? desc.classes : []) {
+      if (typeof name === "string" && name) features.add("class:" + name);
+    }
+    for (const attr of Array.isArray(desc.attributes) ? desc.attributes : []) {
+      if (!attr || typeof attr.name !== "string" || typeof attr.value !== "string") continue;
+      if (!attr.name.startsWith("data-") && !attr.name.startsWith("aria-") && !["role", "type", "dir"].includes(attr.name)) continue;
+      if (!attr.value.trim()) continue;
+      features.add("attr:" + attr.name + "=" + attr.value.trim());
+    }
+    return features;
+  }
+  function featureSelector(feature) {
+    const [kind, rest] = [feature.slice(0, feature.indexOf(":")), feature.slice(feature.indexOf(":") + 1)];
+    if (kind === "class") return "." + rest;
+    if (kind === "tag") return rest;
+    if (kind === "attr") {
+      const eq = rest.indexOf("=");
+      return "[" + rest.slice(0, eq) + '="' + rest.slice(eq + 1).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"]';
+    }
+    return null;
+  }
+  function featureRank(feature) {
+    if (feature.startsWith("attr:data-")) return 0;
+    if (feature.startsWith("attr:")) return 1;
+    if (feature.startsWith("class:")) return 2;
+    return 3;
+  }
+  function diffStyle(selfDescs, otherDescs) {
+    for (const prop of ROLE_STYLE_PROPS) {
+      if (!selfDescs.every((d) => d && d.styles && typeof d.styles === "object")) continue;
+      const selfValues = new Set(selfDescs.map((d) => d.styles[prop]));
+      if (selfValues.size !== 1) continue;
+      const value = selfDescs[0].styles[prop];
+      if (value === void 0 || value === null || value === "") continue;
+      const otherValues = new Set(otherDescs.map((d) => d && d.styles ? d.styles[prop] : void 0));
+      if (otherValues.size >= 1 && !otherValues.has(value)) {
+        return { kind: "style", prop, value };
+      }
+    }
+    return null;
+  }
+  function diffRole(selfDescs, otherDescs) {
+    const self = capExamples(selfDescs);
+    const other = capExamples(otherDescs);
+    if (!self.length || !other.length) return null;
+    let common = featuresOf(self[0]);
+    for (const desc of self.slice(1)) {
+      const features = featuresOf(desc);
+      common = new Set(Array.from(common).filter((f) => features.has(f)));
+    }
+    const otherAny = /* @__PURE__ */ new Set();
+    for (const desc of other) {
+      for (const f of featuresOf(desc)) otherAny.add(f);
+    }
+    const discriminating = Array.from(common).filter((f) => !otherAny.has(f)).sort((a, b) => featureRank(a) - featureRank(b));
+    if (discriminating.length) {
+      const selector = featureSelector(discriminating[0]);
+      if (selector) return { kind: "selector", selector };
+    }
+    return diffStyle(self, other);
+  }
+
+  // src/wizard-flow.js
+  var WIZARD_LIMITS = {
+    MESSAGE_SAMPLES: 2,
+    // 每侧消息的拾取样例数
+    FLOW_MAX_MATCHES: 3,
+    // 消息流容器可接受的命中数上限
+    INPUT_MAX_MATCHES: 5,
+    // 输入框 / 发送按钮可接受的命中数上限
+    IDENTITY_ENTRY_MIN: 2,
+    // 侧栏条目选择器至少命中的条目数（确保是列表）
+    HEADER_MAX_MATCHES: 3,
+    // 聊天头可接受的命中数上限
+    OPTIONAL_MAX_MATCHES: 2,
+    // 可选步（资料卡/主色采样）命中数上限
+    SIDEBAR_OTHER_MAX: 6,
+    // 参与激活差分的其它侧栏条目数上限（对齐 ROLE_DIFF_LIMITS）
+    TEXT_BUBBLE_MIN_SAMPLES: 2
+    // 气泡差分推导至少需要的消息行样例数
+  };
+  var STEP_TOTAL = 7;
+  var IDENTITY_STEP = 5;
+  var IDENTITY_OPTIONS = [
+    { key: "sidebar", label: "侧栏条目", desc: "点选会话列表里当前激活的条目，自动差分激活状态" },
+    { key: "header", label: "聊天头", desc: "点选顶部的会话标题 / 对方昵称区域" },
+    { key: "url", label: "URL", desc: "网址路径即会话身份，无需拾取（路径含会话 ID 的站点最稳）" }
+  ];
+  var wizardGuard = createRequestGuard();
+  var wiz2 = null;
+  function createSession() {
+    return {
+      step: 1,
+      flowEl: null,
+      flowChain: null,
+      other: { els: [], descs: [] },
+      self: { els: [], descs: [] },
+      rowChain: null,
+      selfMatch: null,
+      inputChain: null,
+      sendButtonChain: null,
+      identity: null,
+      peerCardChain: null,
+      accentSampleChain: null,
+      finalConfig: null,
+      reportView: null
+    };
+  }
+  function safeMatches2(el2, sel) {
+    try {
+      return el2.matches(sel);
+    } catch (e) {
+      return false;
+    }
+  }
+  function stepView(step) {
+    switch (step) {
+      case 1:
+        return {
+          title: "第 1 步 · 拾取消息流容器",
+          desc: "点击包住所有聊天消息的滚动区域",
+          tip: "选同时包住双方消息的最近公共容器，不要点到单条消息"
+        };
+      case 2:
+        return {
+          title: "第 2 步 · 拾取对方消息",
+          desc: "点击一条对方发来的消息（已拾取 " + wiz2.other.els.length + "/" + WIZARD_LIMITS.MESSAGE_SAMPLES + "）",
+          tip: "两条尽量来自不同位置，帮助归纳通用规则"
+        };
+      case 3:
+        return {
+          title: "第 3 步 · 拾取自己的消息",
+          desc: "点击一条你自己发过的消息（已拾取 " + wiz2.self.els.length + "/" + WIZARD_LIMITS.MESSAGE_SAMPLES + "）",
+          tip: "与对方消息在样式或属性上有差异才能区分角色"
+        };
+      case 4:
+        return {
+          title: "第 4 步 · 拾取输入框",
+          desc: "点击底部聊天输入框内部",
+          tip: "将自动尝试定位发送按钮，供主色采样与主题适配使用"
+        };
+      case IDENTITY_STEP:
+        return wiz2.identity && wiz2.identity.mode === "sidebar" ? { title: "第 5 步 · 拾取侧栏当前条目", desc: "点击会话列表中当前激活（高亮）的条目" } : { title: "第 5 步 · 拾取聊天头", desc: "点击顶部的会话标题 / 对方昵称区域" };
+      case 6:
+        return {
+          title: "第 6 步 · 拾取对方资料卡（可选）",
+          desc: "保持资料卡打开，点击卡片本体",
+          optional: true
+        };
+      case 7:
+        return {
+          title: "第 7 步 · 拾取主色采样点（可选）",
+          desc: "点击一个主色明显的元素（如品牌按钮、高亮图标）",
+          optional: true
+        };
+    }
+    return {};
+  }
+  function renderStep(extra = {}) {
+    if (!wiz2) return;
+    if (wiz2.step === IDENTITY_STEP && !wiz2.identity) {
+      renderWizardChoice({
+        title: "第 " + IDENTITY_STEP + " 步 · 会话身份来源",
+        desc: "选择如何识别「当前在和谁聊天」",
+        progress: { current: wiz2.step, total: STEP_TOTAL },
+        options: IDENTITY_OPTIONS
+      });
+      return;
+    }
+    renderWizardStep(Object.assign({
+      progress: { current: wiz2.step, total: STEP_TOTAL },
+      canBack: wiz2.step > 1
+    }, stepView(wiz2.step), extra));
+  }
+  function advance(status) {
+    wiz2.step++;
+    if (wiz2.step > STEP_TOTAL) {
+      finish();
+      return;
+    }
+    renderStep(status ? { status } : {});
+  }
+  function fail(text) {
+    renderStep({ status: { ok: false, text } });
+  }
+  function pickFlow(el2) {
+    const chain = pickChain([serializeElement(el2)], (sel) => countSelectorMatches(sel), {
+      min: 1,
+      max: WIZARD_LIMITS.FLOW_MAX_MATCHES
+    });
+    if (!chain) return fail("未能生成稳定选择器，请点击包住全部消息的容器重试");
+    wiz2.flowEl = el2;
+    wiz2.flowChain = chain;
+    advance();
+  }
+  function pickMessage(el2, role) {
+    const slot = role === "other" ? wiz2.other : wiz2.self;
+    slot.els.push(el2);
+    slot.descs.push(serializeElement(el2));
+    const chain = pickChain(slot.descs, (sel) => countSelectorMatches(sel, wiz2.flowEl), {
+      min: WIZARD_LIMITS.MESSAGE_SAMPLES,
+      matchesFn: (sel) => slot.els.every((sample) => safeMatches2(sample, sel))
+    });
+    if (slot.els.length < WIZARD_LIMITS.MESSAGE_SAMPLES || !chain) {
+      if (slot.els.length >= WIZARD_LIMITS.MESSAGE_SAMPLES) {
+        slot.els = [];
+        slot.descs = [];
+        return fail("未能归纳出稳定的选择器，请重新点选两条" + (role === "other" ? "对方" : "自己") + "消息");
+      }
+      renderStep();
+      return;
+    }
+    if (role === "other") {
+      wiz2.rowChain = chain;
+      if (wiz2.self.descs.length) wiz2.selfMatch = diffRole(wiz2.self.descs, wiz2.other.descs);
+      advance();
+      return;
+    }
+    wiz2.selfMatch = diffRole(wiz2.self.descs, wiz2.other.descs);
+    advance(wiz2.selfMatch ? { ok: true, text: "已识别角色判别规则" } : { ok: false, text: "无法区分角色，所有消息将视为对方" });
+  }
+  var SEND_BUTTON_CANDIDATES = 'button, [role="button"], [class*="send" i]';
+  function deriveSendButtonChain(inputEl) {
+    let node = inputEl.parentElement;
+    while (node && node !== document.body) {
+      const candidates = Array.from(node.querySelectorAll(SEND_BUTTON_CANDIDATES)).filter(isVisible);
+      if (candidates.length) {
+        const colorful = candidates.find((el2) => extractAccentDeep(el2));
+        const target = colorful || candidates[0];
+        return pickChain([serializeElement(target)], (sel) => countSelectorMatches(sel), {
+          min: 1,
+          max: WIZARD_LIMITS.INPUT_MAX_MATCHES
+        });
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+  function pickInput(el2) {
+    const editable = el2.isContentEditable || el2.tagName === "TEXTAREA" || el2.tagName === "INPUT";
+    if (!editable) return fail("这不是可编辑区域，请点击聊天输入框内部");
+    const chain = pickChain([serializeElement(el2)], (sel) => countSelectorMatches(sel), {
+      min: 1,
+      max: WIZARD_LIMITS.INPUT_MAX_MATCHES
+    });
+    if (!chain) return fail("未能归纳输入框选择器，请重试");
+    wiz2.inputChain = chain;
+    wiz2.sendButtonChain = deriveSendButtonChain(el2);
+    advance({
+      ok: true,
+      text: wiz2.sendButtonChain ? "已定位输入框与发送按钮" : "已定位输入框（未找到发送按钮，不影响使用）"
+    });
+  }
+  function pickIdentityElement(el2) {
+    const desc = serializeElement(el2);
+    if (!desc) return fail("无法识别该元素，请重试");
+    if (wiz2.identity.mode === "sidebar") {
+      const chain2 = pickChain([desc], (sel) => countSelectorMatches(sel), {
+        min: WIZARD_LIMITS.IDENTITY_ENTRY_MIN,
+        matchesFn: (sel) => safeMatches2(el2, sel)
+      });
+      if (!chain2) return fail("未能归纳侧栏条目选择器，请点击会话列表中的一个条目");
+      let otherNodes = [];
+      try {
+        otherNodes = Array.from(document.querySelectorAll(chain2[0])).filter((node) => node !== el2).slice(0, WIZARD_LIMITS.SIDEBAR_OTHER_MAX);
+      } catch (e) {
+        otherNodes = [];
+      }
+      const otherDescs = otherNodes.map(serializeElement).filter(Boolean);
+      const activeMatch = otherDescs.length ? diffRole([desc], otherDescs) : null;
+      wiz2.identity.entry = chain2;
+      wiz2.identity.activeMatch = activeMatch;
+      advance(activeMatch ? { ok: true, text: "已识别激活条目的差分规则" } : { ok: false, text: "无法差分激活状态，会话身份不可靠（建议返回改用 URL 身份）" });
+      return;
+    }
+    const chain = pickChain([desc], (sel) => countSelectorMatches(sel), {
+      min: 1,
+      max: WIZARD_LIMITS.HEADER_MAX_MATCHES
+    });
+    if (!chain) return fail("未能归纳聊天头选择器，请重试");
+    wiz2.identity.header = chain;
+    advance();
+  }
+  function pickOptional(el2, field) {
+    const chain = pickChain([serializeElement(el2)], (sel) => countSelectorMatches(sel), {
+      min: 1,
+      max: WIZARD_LIMITS.OPTIONAL_MAX_MATCHES
+    });
+    if (!chain) return fail("未能归纳选择器，请重试或跳过此步");
+    wiz2[field] = chain;
+    advance();
+  }
+  function firstTextHolder(row) {
+    for (const el2 of row.querySelectorAll("*")) {
+      for (const node of el2.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) return el2;
+      }
+    }
+    return null;
+  }
+  function deriveTextBubbleChain() {
+    const rows = wiz2.other.els.filter((el2) => el2.isConnected);
+    const samples = rows.slice(0, WIZARD_LIMITS.TEXT_BUBBLE_MIN_SAMPLES);
+    if (!wiz2.flowEl || !wiz2.flowEl.isConnected || samples.length < WIZARD_LIMITS.TEXT_BUBBLE_MIN_SAMPLES) return null;
+    const descs = samples.map(firstTextHolder).filter(Boolean).map(serializeElement);
+    if (descs.length < WIZARD_LIMITS.TEXT_BUBBLE_MIN_SAMPLES) return null;
+    return pickChain(descs, (sel) => countSelectorMatches(sel, wiz2.flowEl), {
+      min: 1,
+      matchesFn: (sel) => rows.every((row) => row.querySelectorAll(sel).length >= 1)
+    });
+  }
+  function queryChainElement(chain) {
+    if (!chain) return null;
+    for (const sel of chain) {
+      try {
+        const el2 = document.querySelector(sel);
+        if (el2) return el2;
+      } catch (e) {
+      }
+    }
+    return null;
+  }
+  function finish() {
+    const raw = {
+      version: PLATFORM_CONFIG_VERSION,
+      domain: location.hostname,
+      messageFlow: wiz2.flowChain,
+      messageRow: wiz2.rowChain,
+      textBubble: deriveTextBubbleChain(),
+      inputBox: wiz2.inputChain,
+      sendButton: wiz2.sendButtonChain,
+      selfMatch: wiz2.selfMatch,
+      peerCard: wiz2.peerCardChain,
+      accentSample: wiz2.accentSampleChain,
+      identity: wiz2.identity
+    };
+    raw.capabilities = deriveCapabilities(raw);
+    const finalConfig = normalizePlatformConfig(raw, location.hostname);
+    if (!finalConfig) {
+      wiz2.finalConfig = null;
+      logError("拾取配置未通过 schema 校验（不应发生）");
+      renderWizardReport({ items: [], suggestions: [], error: "配置校验未通过（不应发生），请点击「重新拾取」重试" });
+      return;
+    }
+    wiz2.finalConfig = finalConfig;
+    log("拾取配置已生成，开始自检");
+    runSelfCheck();
+  }
+  async function runSelfCheck() {
+    const config2 = wiz2.finalConfig;
+    const temp = createCustomPlatform(config2);
+    const msgs = temp.collectMessages();
+    const selfCount = msgs.filter((m) => m.role === "self").length;
+    const items = [
+      {
+        label: "消息行识别",
+        value: "对方 " + (msgs.length - selfCount) + " 条 / 自己 " + selfCount + " 条",
+        ok: msgs.length > 0
+      }
+    ];
+    const inputEl = queryChainElement(config2.inputBox);
+    let inputDesc = "未找到";
+    if (inputEl && inputEl.isContentEditable) inputDesc = "富文本 · execCommand 写入";
+    else if (inputEl) inputDesc = "原生控件 · 值赋值写入";
+    items.push({ label: "输入框", value: inputDesc, ok: !!inputEl });
+    const info = temp.getConversationInfo();
+    items.push({
+      label: "会话身份",
+      value: info.key ? info.reliable ? "稳定" : "不可靠" : "未识别",
+      ok: !!(info.key && info.reliable)
+    });
+    if (!config2.accentSample) {
+      items.push({ label: "主色采样", value: "未配置（使用默认主色）", ok: null });
+    } else {
+      const color = extractAccentDeep(queryChainElement(config2.accentSample));
+      items.push({ label: "主色采样", value: color ? "已采样主色" : "采样点未通过颜色校验", ok: color ? true : false });
+    }
+    wiz2.reportView = { items, suggestions: [] };
+    renderWizardReport(Object.assign({}, wiz2.reportView, { busy: true }));
+    wizardGuard.cancel();
+    const pending = genSuggestions(msgs, null, null);
+    const handle = wizardGuard.track(pending);
+    try {
+      const result = await pending;
+      if (handle.stale() || !isWizardOpen()) return;
+      items.push({ label: "端到端建议生成", value: result.suggestions.length + " 条", ok: true });
+      wiz2.reportView = {
+        items,
+        suggestions: ["示例建议：" + result.suggestions[0]]
+      };
+      renderWizardReport(wiz2.reportView);
+      log("向导端到端自检通过");
+    } catch (e) {
+      if (handle.stale() || !isWizardOpen()) return;
+      logWarn("向导端到端自检失败: " + e.message);
+      wiz2.reportView = {
+        items,
+        suggestions: [],
+        error: "端到端自检未完成（" + e.message + "）；结构自检仍有效，可在设置中配置 AI 后使用"
+      };
+      renderWizardReport(wiz2.reportView);
+    } finally {
+      handle.done();
+    }
+  }
+  function onPick(el2) {
+    if (!wiz2 || wiz2.step > STEP_TOTAL || !el2 || el2.nodeType !== Node.ELEMENT_NODE) return;
+    if (wiz2.step === IDENTITY_STEP && !wiz2.identity) return;
+    switch (wiz2.step) {
+      case 1:
+        pickFlow(el2);
+        break;
+      case 2:
+        pickMessage(el2, "other");
+        break;
+      case 3:
+        pickMessage(el2, "self");
+        break;
+      case 4:
+        pickInput(el2);
+        break;
+      case IDENTITY_STEP:
+        pickIdentityElement(el2);
+        break;
+      case 6:
+        pickOptional(el2, "peerCardChain");
+        break;
+      case 7:
+        pickOptional(el2, "accentSampleChain");
+        break;
+    }
+  }
+  function onChooseIdentity(mode) {
+    if (!wiz2 || wiz2.step !== IDENTITY_STEP || wiz2.identity) return;
+    if (!IDENTITY_OPTIONS.some((option) => option.key === mode)) return;
+    wiz2.identity = { mode };
+    if (mode === "url") {
+      advance();
+      return;
+    }
+    renderStep();
+  }
+  function onSkip() {
+    if (!wiz2) return;
+    if (wiz2.step === 6) {
+      wiz2.peerCardChain = null;
+      advance();
+    } else if (wiz2.step === 7) {
+      wiz2.accentSampleChain = null;
+      advance();
+    }
+  }
+  function resetStepData(step) {
+    switch (step) {
+      case 2:
+        wiz2.other = { els: [], descs: [] };
+        wiz2.rowChain = null;
+        break;
+      case 3:
+        wiz2.self = { els: [], descs: [] };
+        wiz2.selfMatch = null;
+        break;
+      case 4:
+        wiz2.inputChain = null;
+        wiz2.sendButtonChain = null;
+        break;
+      case IDENTITY_STEP:
+        wiz2.identity = null;
+        break;
+      case 6:
+        wiz2.peerCardChain = null;
+        break;
+      case 7:
+        wiz2.accentSampleChain = null;
+        break;
+    }
+  }
+  function onBack() {
+    if (!wiz2 || wiz2.step <= 1 || wiz2.step > STEP_TOTAL) return;
+    wiz2.step--;
+    resetStepData(wiz2.step);
+    renderStep();
+  }
+  function onCancel() {
+    wizardGuard.cancel();
+    wiz2 = null;
+    unmountWizard();
+    log("拾取向导已关闭");
+  }
+  function onRestart() {
+    wizardGuard.cancel();
+    wiz2 = createSession();
+    renderStep();
+  }
+  function onSave() {
+    if (!wiz2 || !wiz2.finalConfig) return;
+    const base = wiz2.reportView || { items: [], suggestions: [] };
+    if (savePlatformConfig(wiz2.finalConfig)) {
+      wiz2.reportView = Object.assign({}, base, { error: void 0, saved: true });
+      renderWizardReport(wiz2.reportView);
+      log("拾取配置已保存，即将刷新页面生效");
+      setTimeout(() => location.reload(), TIMING.WIZARD_RELOAD_DELAY);
+      return;
+    }
+    wiz2.reportView = Object.assign({}, base, { error: "保存失败：配置未通过校验，请「重新拾取」" });
+    renderWizardReport(wiz2.reportView);
+  }
+  function startWizard() {
+    if (isWizardOpen()) return;
+    wiz2 = createSession();
+    mountWizard({
+      onPick,
+      onChooseIdentity,
+      onSkip,
+      onBack,
+      onCancel,
+      onSave,
+      onRestart
+    });
+    renderStep();
+    log("拾取向导已启动");
+  }
+
   // src/main.js
   setActions({
     loadSuggestions,
@@ -2979,9 +4572,22 @@
     analyzeBothCards,
     savePlayerCard,
     summarizeMemory,
-    clearConversationMemory
+    clearConversationMemory,
+    startWizard
   });
+  function registerMenuCommands() {
+    if (typeof GM_registerMenuCommand !== "function") return;
+    GM_registerMenuCommand("启动拾取向导（教我识别当前站点）", () => startWizard());
+    if (hasCustomConfig()) {
+      GM_registerMenuCommand("清除本站拾取配置（恢复内置/停用）", () => {
+        clearPlatformConfig();
+        location.reload();
+      });
+    }
+  }
   function main() {
+    registerMenuCommands();
+    if (adapterId === "null") return;
     installClickCapture();
     const info = resolveCurrentConversation();
     if (info.key) activateConversation(info);
@@ -2999,7 +4605,7 @@
       if (event.key === "Escape") closeModal();
     });
     setInterval(ensureUIAlive, TIMING.UI_PATROL_INTERVAL);
-    log("Soul AI 助手 v1.8.0 已加载");
+    log("Soul AI 助手 v1.9.0 已加载");
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", main);

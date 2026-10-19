@@ -8,7 +8,7 @@ import { closeModal } from './modals.js';
 import { renderSettings, openSettingsModal, onSaveSettings } from './settings.js';
 import { openCharacterModal, switchCardTab, readPlayerForm } from './card.js';
 import { applyTheme } from './theme.js';
-import { captureChatScroll, restoreChatScroll, findComposer } from '../platform.js';
+import { captureChatScroll, restoreChatScroll, findComposer, adapterId } from '../platform.js';
 import { findHostMount } from '../dom.js';
 import { exportPeerCard, exportPlayerCard } from '../card-export.js';
 import { pendingMemoryMessages } from '../memory.js';
@@ -42,7 +42,8 @@ export function mountUI() {
   host.id = HOST_ELEMENT_ID;
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = buildRootHtml();
-  const mountPoint = findHostMount(composer);
+  // 拾取接入的站点启用底栏逃逸（吸附在底栏之上）；Soul 走既有挂载算法，外观不变
+  const mountPoint = findHostMount(composer, { dockEscape: adapterId.startsWith('custom:') });
   if (!mountPoint.parent) return;
   host.style.cssText = 'display:block;width:100%;min-width:0;flex:none;align-self:stretch;margin:0 0 8px;';
   mountPoint.parent.insertBefore(host, mountPoint.anchor);

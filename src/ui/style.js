@@ -2,6 +2,8 @@
  * UI 样式 —— Shadow DOM 内部 CSS，与宿主页面隔离
  * 色值全部走 :host 上的设计令牌；主题模块（ui/theme.js）按明暗检测与
  * 主色提取结果覆盖令牌。此处 :host 内为浅色默认值。
+ * UI_CSS 供建议条与弹层等既有组件使用；WIZARD_CSS 仅拾取向导宿主叠加
+ * 注入（组件规则 .wizard-*，不含令牌定义）。
  * ===================================================================== */
 export const UI_CSS = `
   :host {
@@ -268,4 +270,84 @@ export const UI_CSS = `
     border-radius: 10px; padding: 9px; cursor: pointer; font-size: 13px; font-weight: 600;
   }
   .pop .save:hover { background: var(--accent-strong); }
+  .chip.repick {
+    color: var(--accent-deep); border-color: var(--accent-border); background: var(--accent-soft);
+  }
+  .chip.repick:hover { background: var(--accent-soft-hover); }
+`;
+
+export const WIZARD_CSS = `
+  .wizard-layer {
+    position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+    display: flex; align-items: center; justify-content: flex-end; padding: 16px;
+  }
+  .wizard-panel {
+    pointer-events: auto; width: 340px; max-width: calc(100vw - 32px);
+    max-height: 80vh; overflow-y: auto; padding: 16px 16px 14px; color: var(--fg);
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(22,55,48,.28);
+  }
+  .wizard-head { cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .wizard-title { font-size: 14px; font-weight: 700; color: var(--fg-strong); }
+  .wizard-progress { margin-top: 3px; font-size: 10.5px; letter-spacing: .04em; color: var(--fg-faint); }
+  .wizard-bar {
+    margin-top: 8px; height: 4px; border-radius: 999px; overflow: hidden;
+    background: var(--bg-soft);
+  }
+  .wizard-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .wizard-body { margin-top: 10px; font-size: 12px; line-height: 1.65; color: var(--fg-body); }
+  .wizard-status {
+    margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.55;
+    background: var(--bg-soft); border: 1px solid var(--border-soft); color: var(--fg-muted);
+  }
+  .wizard-status.ok { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-deep); }
+  .wizard-status.err { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+  .wizard-tip {
+    margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 11px; line-height: 1.6;
+    background: var(--watch-bg); border: 1px solid var(--watch-border); color: var(--watch-text);
+  }
+  .wizard-foot {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft);
+  }
+  .wizard-btn {
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg-body);
+    border-radius: 9px; padding: 7px 12px; font-size: 11.5px; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .wizard-btn:hover { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-deep); }
+  .wizard-btn:disabled { opacity: .55; cursor: default; }
+  .wizard-btn:disabled:hover { background: var(--bg-card); border-color: var(--border); color: var(--fg-body); }
+  .wizard-btn.primary { border: none; background: var(--accent); color: #fff; font-weight: 600; }
+  .wizard-btn.primary:hover { background: var(--accent-strong); }
+  .wizard-btn.primary:disabled { background: var(--accent); }
+  .wizard-btn.primary:disabled:hover { background: var(--accent); }
+  .wizard-option {
+    display: block; width: 100%; text-align: left; margin-top: 8px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset);
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .wizard-option:hover { border-color: var(--accent-focus); background: var(--accent-soft); }
+  .wizard-option b { display: block; margin-bottom: 2px; font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+  .wizard-option span { display: block; font-size: 11px; line-height: 1.5; color: var(--fg-muted); }
+  .wizard-report { display: flex; flex-direction: column; gap: 6px; }
+  .wizard-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 7px 10px;
+    border-radius: 9px; background: var(--bg-inset); border: 1px solid var(--border-soft);
+  }
+  .wizard-item .k { flex: none; font-size: 11px; color: var(--fg-faint); }
+  .wizard-item .v { flex: 1; min-width: 0; text-align: right; word-break: break-all; font-size: 11.5px; color: var(--fg-body); }
+  .wizard-item.ok .v { color: var(--accent-deep); }
+  .wizard-item.bad .v { color: var(--danger); }
+  .wizard-sugg { margin-top: 10px; }
+  .wizard-sugg-label { margin-bottom: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--fg-faint); }
+  .wizard-sugg-item {
+    margin-top: 5px; padding: 7px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.55;
+    background: var(--accent-soft); border: 1px solid var(--accent-border); color: var(--accent-deep);
+  }
+  .wizard-hover {
+    position: fixed; display: none; z-index: 2147483647; pointer-events: none;
+    border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+  .wizard-hover.show { display: block; }
 `;

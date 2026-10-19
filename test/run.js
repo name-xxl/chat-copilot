@@ -7,3 +7,7 @@ import './character.test.js';
 import './profile.test.js';
 import './memory.test.js';
 import './theme.test.js';
+import './dom.test.js';
+import './selector-gen.test.js';
+import './role-diff.test.js';
+import './platform-config.test.js';

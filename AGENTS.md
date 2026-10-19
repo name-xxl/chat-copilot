@@ -7,14 +7,17 @@
 ```
 环境层    selectors / config / storage / constants
 工具层    utils / request-guard / state / actions（动作总线）
-平台层    platform.js（门面：稳定接口 + 输入写入/滚动/健康检查等通用算法）
+平台层    platform.js（门面：稳定接口 + 输入写入/滚动/健康检查等通用算法 + 拾取配置读写与适配器选择）
           platform/soul.js（Soul 适配器：定位、采集、会话身份启发式）
-通用 DOM  dom（firstTextLine / isVisible / sameConversation / findHostMount）
+          platform/custom.js（拾取配置驱动的通用适配器）
+          platform/null.js（未适配域名的空适配器：全空降级，不采集不报错）
+通用 DOM  dom（firstTextLine / isVisible / sameConversation / findHostMount / serializeElement / countSelectorMatches）
 采集逻辑  conversation（三层身份解析，基于平台接口）/ transcript
 领域层    ai-client / prompts / insight / character / profile / memory / card-export
-流程层    suggestion-flow / cards-flow / memory-flow / chat-monitor
-UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/card/core/theme）
-入口      main.js（唯一的装配点：setActions 注入 + 事件绑定 + 启动）
+          selector-gen（选择器泛化）/ role-diff（角色差分）/ platform-config（拾取配置 schema 归一）
+流程层    suggestion-flow / cards-flow / memory-flow / wizard-flow（拾取向导）/ chat-monitor
+UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/card/core/theme/wizard）
+入口      main.js（唯一的装配点：setActions 注入 + 事件绑定 + TM 菜单注册 + 域名闸门 + 启动）
 ```
 
 依赖只允许自上而下（UI → 流程 → 领域 → 采集/平台 → 工具 → 环境），禁止反向。例外仅限：
@@ -22,7 +25,7 @@ UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/ca
 - UI 通过 `actions` 总线间接调用流程，**不得直接 import 任何 `*-flow` 模块**；
 - 流程层之间的调用保持现有方向（`cards-flow → suggestion-flow`），新增前先想清楚归属。
 
-**平台耦合只允许出现在 `selectors.js` + `platform/soul.js` + `prompts.js` 的平台语义文案里**。消费方一律从 `platform.js` 门面导入采集/定位接口（`collectMessages / getConversationInfo / findComposer / fillInput / captureChatScroll` 等），不得直接 import 适配器或 `selectors.js`。接入新平台 = 新增 `platform/<name>.js` 并在门面绑定，不许把平台判断散进流程层。适配器须声明 `capabilities`（stableIdentity / roleDetection / peerProfile），能力不足时由流程层闸门自动降级（如禁用长期记忆与角色卡）。
+**平台耦合只允许出现在 `selectors.js` + `platform/soul.js` + `prompts.js` 的平台语义文案里**。消费方一律从 `platform.js` 门面导入采集/定位接口（`collectMessages / getConversationInfo / findComposer / fillInput / captureChatScroll` 等），不得直接 import 适配器或 `selectors.js`。接入新平台 = 新增 `platform/<name>.js` 并在门面绑定，不许把平台判断散进流程层。用户自助接入则走拾取向导（`wizard-flow`）：产出的配置按域名存 GM（`storage.js` 的 `platformConfigPrefix` 键前缀），由 `platform.js` 门面在加载时选择适配器（拾取配置 > 内置 Soul > 空适配器）；`main.js` 依据 `adapterId` 做域名闸门，`null` 适配器上不采集、不挂 UI，只保留 TM 菜单入口。适配器须声明 `capabilities`（stableIdentity / roleDetection / peerProfile），能力不足时由流程层闸门自动降级（如禁用长期记忆与角色卡）。
 
 ## 归一约定（强约束）
 
@@ -42,7 +45,7 @@ UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/ca
 - **便于维护**：单一职责，文件超过 ~300 行就该考虑拆分；页面耦合只允许出现在采集层；新代码必须带中文模块头注释（`=====` banner）说明职责。
 - **可复用**：领域校验层保持纯函数（不读 state、不碰 DOM）；往 `memory.js`/`character.js` 这类模块加“顺手读一下 DOM”的函数属于违规，应上移到采集层或流程层。
 - **可扩展**：新增数据域的固定模式 = prompts 构建器 + 领域 normalize 模块 + flow（用请求守卫）+ main.js 注册 action + `ui/` 新子模块；不允许把新功能塞进 `ui.js` 门面或既有无关模块。
-- **强灵活性**：承认本项目是单平台油猴脚本；平台相关假设（中文时间正则、Soul 文案、DOM 启发式）只允许存在于 `selectors.js`/`dom.js`/`conversation.js`/`prompts.js`，为未来多平台化（见 ROADMAP）保留替换边界。
+- **强灵活性**：承认本项目是油猴脚本（内置适配 Soul，其余站点经拾取向导接入）；平台相关假设（中文时间正则、Soul 文案、DOM 启发式）只允许存在于 `selectors.js`/`dom.js`/`conversation.js`/`prompts.js`，为多平台化（见 ROADMAP）保留替换边界。
 - **健壮性**：所有异步写回必须双复核（守卫 stale + `sameConversation`）；存储读写必须容错；任何失败路径要有降级（如意图判断失败退化为直接生成），不允许“失败就静默挂起”。
 
 ## 可测试性约定（易于测试）
@@ -50,7 +53,7 @@ UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/ca
 - 分层本身就是可测试性的边界：**领域层与工具层必须是纯函数**——不读 `state`、不碰 `document/window/GM_*`，保证 `node --test` 无环境直跑；需要副作用的逻辑上移到采集层/流程层。
 - 新代码默认写成"可测形状"：输入→输出的函数、依赖注入（actions 总线、请求守卫是范例），而不是读全局可变量或隐式单例。
 - 副作用收口在三处：DOM（`dom.js`/`ui/`）、存储（`storage.js`）、网络（`ai-client.js`）。mock 这三处即可覆盖全部流程层测试，别把副作用撒到第四个模块。
-- 测试放在 `test/`，命名 `<模块>.test.js`，默认只用 `node --test`（零依赖）；`npm test` 走单进程聚合入口 `test/run.js`，新增测试文件必须同步在 `run.js` 登记（避免每文件一个子进程的 Windows 启动开销）；引入 DOM 仿真或浏览器自动化依赖前必须先讨论（见 ROADMAP P5）。
+- 测试放在 `test/`，命名 `<模块>.test.js`，默认只用 `node --test`（零依赖）；`npm test` 走单进程聚合入口 `test/run.js`，新增测试文件必须同步在 `run.js` 登记（避免每文件一个子进程的 Windows 启动开销）；引入 DOM 仿真或浏览器自动化依赖前必须先讨论（见 ROADMAP P5）。现有用例：utils/insight/character/profile/memory/theme 纯函数，以及拾取向导三件套 selector-gen / role-diff / platform-config。
 - 测试体系就位后：修 bug 先写失败用例再修；新领域模块的 `normalize*`/解析函数随功能一起提交测试，不允许"以后补"。
 
 ## 领域红线（不可触碰）

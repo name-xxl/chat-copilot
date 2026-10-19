@@ -17,7 +17,11 @@ export const TIMING = {
   CLICK_CANDIDATE_TTL: 15000,      // 点击意图候选的有效期
   // 接口
   AI_REQUEST_TIMEOUT: 60000,
+  // 拾取向导
+  WIZARD_HOVER_THROTTLE: 60,       // 向导悬停高亮的节流间隔
+  WIZARD_RELOAD_DELAY: 1200,       // 保存拾取配置后的提示展示时长，随后刷新页面生效
 };
 
 export const LOG_PREFIX = '[SoulAI]';
 export const HOST_ELEMENT_ID = 'soul-ai-bar-host';
+export const WIZARD_HOST_ID = 'soul-ai-wizard-host';

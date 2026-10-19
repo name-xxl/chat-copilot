@@ -1,5 +1,6 @@
 /* =====================================================================
  * 会话监测 —— 消息基线、会话切换、MutationObserver、挂载维持
+ * 向导打开期间抑制结构错误提示（不渲染 chips，只取消在途请求）
  * ===================================================================== */
 import { sameConversation } from './dom.js';
 import {
@@ -10,6 +11,7 @@ import { state, resetInsightCache, resetCharacterCache } from './state.js';
 import { loadConversationMemory, emptyMemory } from './memory.js';
 import {
   mountUI, unmountUI, syncHostLayout, isCollapsed, ui, refreshCardModal, renderChips,
+  isWizardOpen, renderRepickChip,
 } from './ui.js';
 import {
   cancelSuggestions, resetSuggestionState, loadSuggestions, scheduleSuggestionRefresh, hasActiveRequest,
@@ -59,26 +61,31 @@ function establishMessageBaseline() {
 
 export let clearDebounce = null;
 let unmountDebounce = null;
-let structureBroken = false;
 let brokenStrikes = 0;
+let brokenAnnounced = false;
 
 // 结构健康巡检：聊天窗在而消息流连续两次缺失才判定改版失效（防切换瞬间误报），
-// 恢复命中即自动重新生成建议
+// 恢复命中即自动重新生成建议。结构失效的唯一事实来源是 platform 的 isStructureBroken()；
+// 向导打开期间只取消在途请求，不渲染任何提示，避免干扰拾取。
 function watchStructureHealth() {
   const { ok } = checkHealth();
   if (ok) {
-    if (structureBroken) loadSuggestions(false);
-    structureBroken = false;
+    if (brokenAnnounced) {
+      brokenAnnounced = false;
+      loadSuggestions(false);
+    }
     brokenStrikes = 0;
     return;
   }
-  if (structureBroken) return;
+  if (brokenAnnounced) return;
   brokenStrikes++;
   if (brokenStrikes >= 2) {
-    structureBroken = true;
+    brokenAnnounced = true;
     logWarn('选择器健康检查未通过：聊天窗在而消息流缺失，页面结构可能已改版');
     cancelSuggestions();
-    renderChips(['页面结构已变化，建议功能暂时失效；刷新页面通常可恢复'], 'err');
+    if (isWizardOpen()) return;
+    renderChips(['页面结构已变化，部分功能暂时失效'], 'err');
+    renderRepickChip();
   }
 }
 
