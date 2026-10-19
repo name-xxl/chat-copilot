@@ -50,7 +50,7 @@ UI 层     ui.js（门面）+ ui/（shared/style/template/bar/modals/settings/ca
 - 分层本身就是可测试性的边界：**领域层与工具层必须是纯函数**——不读 `state`、不碰 `document/window/GM_*`，保证 `node --test` 无环境直跑；需要副作用的逻辑上移到采集层/流程层。
 - 新代码默认写成"可测形状"：输入→输出的函数、依赖注入（actions 总线、请求守卫是范例），而不是读全局可变量或隐式单例。
 - 副作用收口在三处：DOM（`dom.js`/`ui/`）、存储（`storage.js`）、网络（`ai-client.js`）。mock 这三处即可覆盖全部流程层测试，别把副作用撒到第四个模块。
-- 测试放在 `test/`，命名 `<模块>.test.js`，默认只用 `node --test`（零依赖）；引入 DOM 仿真或浏览器自动化依赖前必须先讨论（见 ROADMAP P5）。
+- 测试放在 `test/`，命名 `<模块>.test.js`，默认只用 `node --test`（零依赖）；`npm test` 走单进程聚合入口 `test/run.js`，新增测试文件必须同步在 `run.js` 登记（避免每文件一个子进程的 Windows 启动开销）；引入 DOM 仿真或浏览器自动化依赖前必须先讨论（见 ROADMAP P5）。
 - 测试体系就位后：修 bug 先写失败用例再修；新领域模块的 `normalize*`/解析函数随功能一起提交测试，不允许"以后补"。
 
 ## 领域红线（不可触碰）
