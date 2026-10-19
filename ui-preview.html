@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Soul AI 助手 · UI 预览稿</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #e8eaee; color: #333; font-size: 14px;
+    display: flex; gap: 24px; padding: 24px; justify-content: center; align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  /* ===== 模拟 Soul 网页版窗口 ===== */
+  .soul-win {
+    position: relative;
+    width: 420px; height: 720px; background: #fff; border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.15); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .soul-title { padding: 10px 16px; color: #999; font-size: 12px; border-bottom: 1px solid #f0f0f0; }
+  .chat-card {
+    margin: 12px 16px 0; padding: 10px 14px; background: #fafafa; border-radius: 12px;
+  }
+  .chat-card .name { font-weight: 600; }
+  .chat-card .pill {
+    display: inline-block; background: #eef3f2; color: #4a6a68; border-radius: 999px;
+    padding: 2px 8px; font-size: 11px; margin: 6px 6px 0 0;
+  }
+  .msgs { flex: 1; overflow-y: auto; padding: 14px 16px; }
+  .row { display: flex; margin-bottom: 10px; align-items: flex-end; gap: 6px; }
+  .row.self { justify-content: flex-end; }
+  .ava { width: 26px; height: 26px; border-radius: 50%; background: #b8e6e0; flex: none; }
+  .row.self .ava { background: #c9c2ff; }
+  .bub {
+    max-width: 72%; padding: 8px 12px; border-radius: 4px 12px 12px 12px;
+    background: #f0f3f4; color: #5d686d; line-height: 1.5;
+  }
+  .row.self .bub { background: #bdf4f0; color: #345b5a; border-radius: 12px 4px 12px 12px; }
+
+  /* ================= 注入区域 ================= */
+  /* —— ① AI 建议条：浮在输入栏正上方 —— */
+  .sug-bar {
+    position: relative; margin: 0 12px 8px; padding: 8px 8px 9px;
+    border-radius: 16px; background: rgba(255,255,255,.97);
+    border: 1px solid #e3ece8; box-shadow: 0 10px 30px rgba(30,73,66,.10), 0 2px 6px rgba(30,73,66,.05);
+  }
+  .sug-bar.hidden { display: none; }
+  .sug-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 4px; flex: none; padding-left: 2px;
+    color: #3b9d8f; font-size: 11px; font-weight: 600; letter-spacing: .03em;
+  }
+  .brand svg { width: 14px; height: 14px; fill: currentColor; }
+  .insight {
+    display: none; flex: 1; min-width: 0; padding: 4px 8px; border-radius: 999px;
+    background: #fff1f4; border: 1px solid #f4d1da; color: #a3445b;
+    font-size: 10.5px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .insight.show { display: block; }
+  .insight.hidden { display: none; }
+  .chips-wrap {
+    margin-top: 7px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    -ms-overflow-style: none; overscroll-behavior-x: contain;
+  }
+  .chips-wrap::-webkit-scrollbar { display: none; }
+  .chips-wrap.overflowing {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .chips { display: flex; gap: 6px; width: max-content; min-width: 100%; }
+  .sug-chip {
+    flex: none; max-width: 310px; min-height: 34px; background: #f8fbfa;
+    border: 1px solid #e1eae7; border-radius: 10px; padding: 8px 11px;
+    font-size: 12px; line-height: 1.45; color: #35443f; text-align: left; cursor: pointer;
+    white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; transition: background .15s, border-color .15s, transform .15s;
+  }
+  .sug-chip:hover { background: #f0faf7; border-color: #b9ddd5; transform: translateY(-1px); }
+  .sug-chip.loading { color: #8b9995; border-style: dashed; cursor: default; background: #fafcfb; }
+  .sug-chip.error { color: #b4556a; border-color: #f0d6dd; background: #fff7f9; }
+  .sug-tools { display: flex; gap: 2px; margin-left: auto; flex: none; }
+  .mini {
+    display: none; width: max-content; height: 28px; margin: 0 12px 6px auto; padding: 0 10px;
+    align-items: center; gap: 5px; border: 1px solid #e0eae6; border-radius: 999px;
+    background: #fff; color: #348f82; font-size: 11px; font-weight: 500; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(30,73,66,.08);
+  }
+  .mini.show { display: flex; }
+  .mini svg { width: 12px; height: 12px; fill: currentColor; }
+  .icon-btn {
+    width: 26px; height: 26px; border-radius: 8px; border: none; background: transparent;
+    color: #7c8d88; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: background .15s, color .15s, transform .15s;
+  }
+  .icon-btn:hover { background: #eef7f4; color: #337d71; }
+  .icon-btn:active { transform: scale(.94); }
+  .icon-btn svg { width: 15px; height: 15px; display: block; }
+  button:focus { outline: none; }
+  button:focus-visible, .sug-chip:focus-visible {
+    outline: 2px solid rgba(47,158,143,.42); outline-offset: 1px;
+  }
+
+  /* —— ② 输入栏（Soul 原生，仅示意） —— */
+  .composer { padding: 6px 12px 12px; display: flex; gap: 8px; align-items: center; }
+  .input {
+    flex: 1; border: 1px solid #dce8e4; border-radius: 12px; padding: 9px 12px;
+    color: #aab6b2; background: #fff;
+  }
+  .input.filled { color: #34433f; }
+  .send { background: #bdf4f0; color: #345b5a; border: none; border-radius: 12px; padding: 9px 16px; font-weight: 600; }
+
+  /* —— ③ 居中悬浮弹窗：设置 / 角色卡 —— */
+  .modal-layer {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(20,48,42,.24); backdrop-filter: blur(3px); z-index: 20;
+  }
+  .modal-layer.open { display: flex; }
+  .pop {
+    width: min(340px, 100%); max-height: calc(100% - 24px); overflow-y: auto;
+    background: #fff; border: 1px solid #e5ece9; border-radius: 20px;
+    box-shadow: 0 24px 70px rgba(22,55,48,.28); padding: 18px; display: none; color: #3d4b47;
+  }
+  .pop.open { display: block; }
+  .role-card {
+    width: min(360px, 100%); max-height: calc(100% - 24px); overflow-y: auto;
+    background: #fff; border: 1px solid #e3ece8; border-radius: 20px;
+    box-shadow: 0 24px 70px rgba(22,55,48,.28); display: none; color: #3d4b47;
+  }
+  .role-card.open { display: block; }
+  .card-tabs {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center; gap: 2px; padding: 9px 10px;
+    border-bottom: 1px solid #eef4f2; background: #fbfdfc;
+  }
+  .card-tab {
+    border: none; background: transparent; color: #81918c; font-size: 11.5px;
+    padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  }
+  .card-tab.active { background: #e9f8f4; color: #2f7d70; font-weight: 600; }
+  .card-tabs-spacer { flex: 1; }
+  .card-ai {
+    display: inline-flex; align-items: center; gap: 4px; border: none;
+    background: #e9f8f4; color: #2f7d70; border-radius: 8px;
+    padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+  .card-ai svg { width: 13px; height: 13px; fill: currentColor; }
+  .player-pane { padding: 16px 18px 18px; }
+  .player-intro {
+    margin-bottom: 12px; padding: 9px 10px; border-radius: 10px;
+    background: #f7fbfa; color: #73847e; font-size: 11px; line-height: 1.6;
+  }
+  .player-field { margin-bottom: 9px; }
+  .player-label { display: block; font-size: 11px; color: #85938f; margin-bottom: 4px; }
+  .player-pane input, .player-pane textarea {
+    width: 100%; background: #f8faf9; border: 1px solid #e3eae7; border-radius: 9px;
+    padding: 8px 10px; font-size: 12px; color: #32423e; font-family: inherit; outline: none;
+  }
+  .player-pane textarea { height: 50px; resize: vertical; }
+  .player-pane input:focus, .player-pane textarea:focus { border-color: #74c9bc; box-shadow: 0 0 0 3px rgba(47,158,143,.10); }
+  .player-actions, .card-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 13px; }
+  .player-save {
+    border: none; border-radius: 9px; background: #2f9e8f; color: #fff;
+    padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .export-btn {
+    border: 1px solid #dfeae6; background: #fff; color: #3d746a;
+    border-radius: 9px; padding: 7px 10px; font-size: 11px; cursor: pointer;
+  }
+  .player-status { margin-top: 10px; font-size: 11px; color: #2f7d70; }
+  .role-top {
+    display: flex; align-items: center; gap: 12px; padding: 18px 18px 15px;
+    border-bottom: 1px solid #eef4f2;
+    background: linear-gradient(135deg, #eafaf6 0%, #f7fbfa 62%, #fff 100%);
+  }
+  .role-avatar {
+    width: 50px; height: 50px; border-radius: 15px; flex: none;
+    background: linear-gradient(135deg, #2f9e8f, #82d7c9); color: #fff;
+    display: grid; place-items: center; font-size: 20px; font-weight: 700;
+    box-shadow: 0 6px 18px rgba(47,158,143,.28);
+  }
+  .role-meta { min-width: 0; flex: 1; }
+  .role-hidden { display: none !important; }
+  .role-name { font-size: 18px; font-weight: 700; color: #2e3d39; }
+  .role-sub { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; color: #8a9995; }
+  .role-stage { padding: 2px 7px; border-radius: 999px; background: #dff5ef; color: #2f7d70; font-weight: 600; }
+  .role-actions { display: flex; gap: 2px; align-self: flex-start; }
+  .role-action {
+    width: 28px; height: 28px; border: none; border-radius: 8px;
+    background: rgba(255,255,255,.65); color: #71837d; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .role-action:hover { background: #fff; color: #2f7d70; }
+  .role-action svg { width: 15px; height: 15px; }
+  .role-body { padding: 15px 18px 18px; }
+  .role-section { margin-top: 14px; }
+  .role-section:first-child { margin-top: 0; }
+  .role-label { margin-bottom: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: #93a29e; }
+  .role-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .role-tag {
+    padding: 3px 8px; border-radius: 999px; background: #f4f8f7;
+    border: 1px solid #e4ece9; color: #596a64; font-size: 11px; line-height: 1.4;
+  }
+  .role-tag.accent { background: #e9f8f4; border-color: #d5eee7; color: #2f7d70; }
+  .role-tag.avoid { background: #fff4f6; border-color: #f3dbe1; color: #a85b6b; }
+  .role-summary, .role-memory-summary { margin: 0 0 8px; font-size: 12.5px; line-height: 1.7; color: #44534e; }
+  .role-events { list-style: none; margin: 0; padding: 0; }
+  .role-events li { position: relative; padding-left: 15px; margin: 8px 0; font-size: 12px; line-height: 1.6; color: #4c5b56; }
+  .role-events li::before {
+    content: ''; position: absolute; left: 2px; top: 7px; width: 6px; height: 6px;
+    border-radius: 50%; background: #8fd7ca; box-shadow: 0 0 0 3px #effaf7;
+  }
+  .role-approach { margin: 0; padding-left: 18px; color: #4c5b56; font-size: 12px; line-height: 1.75; }
+  .role-approach li::marker { color: #3b9d8f; font-weight: 600; }
+  .role-note { margin-top: 15px; padding-top: 12px; border-top: 1px solid #eef3f1; color: #9aa7a3; font-size: 10.5px; line-height: 1.6; }
+  .pop-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .pop h4 { font-size: 14px; font-weight: 600; color: #33413d; }
+  .pop-close {
+    width: 26px; height: 26px; border: none; border-radius: 7px; background: transparent;
+    color: #879690; font-size: 17px; line-height: 1; cursor: pointer;
+  }
+  .pop-close:hover { background: #f0f5f3; color: #3f5b54; }
+  .pop label { display: block; font-size: 11.5px; color: #85938f; margin: 9px 0 4px; }
+  .pop input, .pop textarea {
+    width: 100%; background: #f8faf9; border: 1px solid #e3eae7; border-radius: 9px;
+    padding: 8px 10px; font-size: 12px; color: #32423e; font-family: inherit; outline: none;
+  }
+  .pop textarea { height: 62px; resize: vertical; }
+  .pop input:focus, .pop textarea:focus { border-color: #74c9bc; box-shadow: 0 0 0 3px rgba(47,158,143,.10); }
+  .pop .check-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 11px;
+    color: #52605c; font-size: 12px; cursor: pointer;
+  }
+  .pop .check-row input { width: auto; margin: 0; accent-color: #2f9e8f; }
+  .form-error { display: none; margin-top: 8px; color: #b4556a; font-size: 12px; line-height: 1.5; }
+  .form-error.show { display: block; }
+  .pop .save { margin-top: 13px; width: 100%; background: #2f9e8f; color: #fff; border: none; border-radius: 10px; padding: 9px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .pop .save:hover { background: #278b7e; }
+
+  .doc { width: 300px; font-size: 13px; line-height: 1.9; color: #555; }
+  .doc h3 { color: #333; margin-bottom: 8px; }
+  .doc li { margin: 6px 0 6px 18px; }
+  .doc b { color: #4a3fd6; }
+  .demo-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .demo-btn {
+    border: 1px solid #ddd8ff; background: #f2f0ff; color: #4a3fd6;
+    border-radius: 999px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+  }
+  .demo-btn:hover { background: #e6e2ff; }
+</style>
+</head>
+<body>
+
+<div class="soul-win">
+  <div class="soul-title">Soul App — 模拟聊天窗口（虚线框内为脚本注入部分）</div>
+
+  <!-- 对方资料卡（原生） -->
+  <div class="chat-card">
+    <span class="name">草莓小云朵</span>
+    <div>
+      <span class="pill">匹配度 93%</span><span class="pill">王侯将相星球</span>
+    </div>
+    <div style="font-size:11px;color:#999;margin-top:6px;">ENTJ · 引力签：音乐爱好者、运动爱好者 · 共同点：风象星座</div>
+  </div>
+
+  <!-- 消息区（原生） -->
+  <div class="msgs">
+    <div class="row"><div class="ava"></div><div class="bub">你也是风象星座呀，难怪聊得来</div></div>
+    <div class="row self"><div class="bub">哈哈是诶，你是天平还是双子</div><div class="ava"></div></div>
+    <div class="row"><div class="ava"></div><div class="bub">天平！你平时喜欢听什么歌</div></div>
+  </div>
+
+  <button type="button" class="mini" id="miniBtn" title="展开 AI 建议" aria-label="展开 AI 建议">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.1 7.4L21.5 12l-7.4 2.1L12 21.5l-2.1-7.4L2.5 12l7.4-2.1z"/></svg>
+    <span>AI 建议</span>
+  </button>
+
+  <!-- ① AI 建议条（注入，位于输入栏上方） -->
+  <div class="sug-bar" id="sugBar">
+    <div class="sug-head">
+      <span class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.1 7.4L21.5 12l-7.4 2.1L12 21.5l-2.1-7.4L2.5 12l7.4-2.1z"/></svg>
+        <span>AI</span>
+      </span>
+      <div class="insight show" id="insight" title="判断依据：对方在确认你是否重视这段关系&#10;对方需要：你的在乎&#10;是否给实质：先别给实质&#10;氛围：还在等你表态&#10;把握 84%">
+        风险 7/9 偏危险 · 确认关系/态度 · 接住情绪
+      </div>
+      <div class="sug-tools">
+        <button type="button" class="icon-btn" id="refreshBtn" title="换一批" aria-label="换一批">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.7 4.5"/><path d="M20 4v7h-7"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="cardBtn" title="角色卡" aria-label="角色卡">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10.5" r="1.8"/><path d="M5.5 16c.7-1.8 1.7-2.7 3-2.7s2.3.9 3 2.7M14 10h4M14 14h4"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="cfgBtn" title="AI 设置" aria-label="AI 设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="hideBtn" title="收起（输入框上方留 ✦ 可展开）" aria-label="收起">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="chips-wrap">
+      <div class="chips" id="chips">
+        <button type="button" class="sug-chip">我也超爱听周杰伦！你最近单曲循环哪首</button>
+        <button type="button" class="sug-chip">天平座品味不会差，推荐首歌给我？</button>
+        <button type="button" class="sug-chip">那必须的，你平时还喜欢听谁的歌</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 输入栏（原生） -->
+  <div class="composer">
+    <div class="input" id="inputBox">输入消息...</div>
+    <button class="send" type="button">发送</button>
+  </div>
+
+  <!-- ③ 居中悬浮弹窗：设置 / 角色卡 -->
+  <div class="modal-layer" id="modalLayer">
+    <div class="pop" id="pop">
+      <div class="pop-head">
+        <h4>AI 设置</h4>
+        <button type="button" class="pop-close" id="popClose" title="关闭" aria-label="关闭设置">×</button>
+      </div>
+      <label>Base URL（OpenAI 兼容）</label><input id="baseUrl" value="https://api.deepseek.com">
+      <label>API Key</label><input id="apiKey" type="password" value="sk-****" autocomplete="off">
+      <label>模型名</label><input id="model" value="deepseek-chat">
+      <label>我的昵称（AI 以此身份说话）</label><input id="myName" value="你的Soul昵称">
+      <label>人设 Prompt（AI 的性格/说话风格）</label><textarea id="persona">你是一个真实、自然的聊天对象，回复口语化、简短，像朋友一样聊天。</textarea>
+      <label>温度 <span style="color:#bbb">0~1，越高越放飞</span></label><input id="temperature" value="0.8">
+      <label class="check-row"><input id="insightEnabled" type="checkbox" checked><span>先判断意图和风险（多一次请求）</span></label>
+      <div class="form-error" id="formError" role="alert"></div>
+      <button type="button" class="save" id="saveBtn">保存</button>
+    </div>
+
+    <section class="role-card" id="roleCard" aria-label="角色卡">
+      <div class="card-tabs">
+        <button type="button" class="card-tab active" data-card-tab="peer">对方角色卡</button>
+        <button type="button" class="card-tab" data-card-tab="player">我的主角卡</button>
+        <span class="card-tabs-spacer"></span>
+        <button type="button" class="card-ai" id="aiCards" title="用对话同时提炼两张卡">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.1 7.4L21.5 12l-7.4 2.1L12 21.5l-2.1-7.4L2.5 12l7.4-2.1z"/></svg>
+          <span>AI 提炼</span>
+        </button>
+        <button type="button" class="role-action" id="roleClose" title="关闭" aria-label="关闭角色卡">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="card-pane peer-pane" data-card-pane="peer">
+        <div class="role-top">
+          <div class="role-avatar">草</div>
+          <div class="role-meta">
+            <div class="role-name">草莓小云朵</div>
+            <div class="role-sub"><span class="role-stage">拉扯</span><span>AI 推断 · 把握 82%</span></div>
+          </div>
+          <div class="role-actions">
+            <button type="button" class="role-action" id="roleRefresh" title="重新分析" aria-label="重新分析">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.7 4.5"/><path d="M20 4v7h-7"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="role-section">
+            <div class="role-label">基础情报</div>
+            <div class="role-tags">
+              <span class="role-tag">匹配度 93%</span><span class="role-tag">王侯将相星球</span><span class="role-tag">ENTJ</span>
+              <span class="role-tag">音乐爱好者</span><span class="role-tag">运动爱好者</span><span class="role-tag">共同点：风象星座</span>
+            </div>
+          </div>
+          <div class="role-section">
+            <div class="role-label">长期记忆</div>
+            <p class="role-memory-summary">双方因晚归和被忽略产生拉扯，当前在缓和。</p>
+            <div class="role-tags">
+              <span class="role-tag accent">待完成 · 补偿一次约会</span>
+            </div>
+          </div>
+          <div class="role-section">
+            <div class="role-label">性格侧写</div>
+            <p class="role-summary">对方表面冷淡，实际在确认你是否重视这段关系；沟通偏敏感，喜欢被认真回应。</p>
+            <div class="role-tags">
+              <span class="role-tag accent">敏感</span><span class="role-tag accent">慢热</span>
+              <span class="role-tag accent">嘴硬心软</span><span class="role-tag accent">需要确认</span>
+            </div>
+          </div>
+          <div class="role-section">
+            <div class="role-label">事件记忆</div>
+            <ul class="role-events">
+              <li>加班与情绪：你答应补偿一次约会</li>
+              <li>加班与情绪：对方说“你根本就不懂我”</li>
+            </ul>
+          </div>
+          <div class="role-section">
+            <div class="role-label">话题偏好</div>
+            <div class="role-tags">
+              <span class="role-tag">音乐</span><span class="role-tag">运动</span><span class="role-tag">被认真回应</span>
+            </div>
+          </div>
+          <div class="role-section">
+            <div class="role-label">尽量避开</div>
+            <div class="role-tags">
+              <span class="role-tag avoid">讲道理</span><span class="role-tag avoid">敷衍</span><span class="role-tag avoid">急着解释</span>
+            </div>
+          </div>
+          <div class="role-section">
+            <div class="role-label">对话攻略</div>
+            <ol class="role-approach">
+              <li>先接住情绪，不急着解释</li>
+              <li>承认自己忽略了对方</li>
+              <li>给出一个具体的补偿安排</li>
+            </ol>
+          </div>
+          <div class="card-actions">
+            <button type="button" class="export-btn" data-export="peer-json">导出 JSON</button>
+            <button type="button" class="export-btn" data-export="peer-txt">导出 TXT</button>
+          </div>
+          <div class="role-note">AI 根据当前聊天和资料卡推断；长期记忆会按话题自动整理。仅供辅助参考。</div>
+        </div>
+      </div>
+      <div class="card-pane player-pane role-hidden" data-card-pane="player">
+        <div class="player-intro">这份档案跨会话共享，会作为“你”的固定事实和说话风格参与生成，避免编造和语气跳脱。</div>
+        <div class="player-field"><label class="player-label">姓名 / 昵称</label><input data-player="name" value="小林"></div>
+        <div class="player-field"><label class="player-label">基本身份</label><textarea data-player="identity">25岁，在上海做设计</textarea></div>
+        <div class="player-field"><label class="player-label">背景经历</label><textarea data-player="background">普通上班族，最近在准备搬家</textarea></div>
+        <div class="player-field"><label class="player-label">性格标签</label><input data-player="personalityTags" value="慢热、嘴硬、细心"></div>
+        <div class="player-field"><label class="player-label">兴趣爱好</label><input data-player="interests" value="音乐、篮球、咖啡"></div>
+        <div class="player-field"><label class="player-label">说话风格</label><textarea data-player="style">短句、口语化、少用感叹号，偶尔冷幽默</textarea></div>
+        <div class="player-field"><label class="player-label">常用表达</label><textarea data-player="phrases">行吧&#10;有点意思&#10;我看看</textarea></div>
+        <div class="player-field"><label class="player-label">禁区与不编造</label><textarea data-player="boundaries">不编造工作细节，不承诺见面，不谈家庭隐私</textarea></div>
+        <div class="player-field"><label class="player-label">稳定事实</label><textarea data-player="facts">在上海做设计&#10;养了一只猫&#10;周末常去打球</textarea></div>
+        <div class="player-actions">
+          <button type="button" class="player-save">保存主角卡</button>
+          <button type="button" class="export-btn" data-export="player-json">导出 JSON</button>
+          <button type="button" class="export-btn" data-export="player-txt">导出 TXT</button>
+        </div>
+        <div class="player-status role-hidden"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="doc">
+  <h3>交互说明</h3>
+  <ul>
+    <li><b>判断层</b>：先分析真实意图、风险 0–9、对方需要和回复策略，再按策略生成候选；换一批复用当前判断</li>
+    <li><b>建议条</b>：位于输入栏上方，打开会话后自动生成一轮；点卡片→填入输入框；↻ 换一批；× 收起后原位留一个小✦可展开</li>
+    <li><b>角色卡</b>：点人物图标打开居中弹窗，展示基础情报、长期记忆、性格侧写、事件记忆和对话攻略；右上角可重新分析</li>
+    <li><b>主角卡</b>：顶部切换到「我的主角卡」，填写身份、稳定事实和说话风格；全局共享，并强制用于生成</li>
+    <li><b>AI 提炼双卡</b>：顶部按钮用一次请求同时更新对方卡和主角卡；只从用户自己发的消息推断主角事实与语言风格，手填的姓名、边界和已有身份会保留</li>
+    <li><b>长期记忆</b>：每个会话单独保存 JSON，只把已有记忆 + 新增消息交给模型合并；之后只带记忆摘要和最近 12 条消息</li>
+    <li><b>导出</b>：两张卡都可以导出 JSON 或 TXT，方便备份和迁移</li>
+    <li><b>只辅助，不发送</b>：脚本只把候选填入输入框，不会点击发送，也不会自动回复</li>
+    <li><b>⚙ 设置</b>：居中悬浮弹窗，包含 Base URL、API Key、模型、昵称、人设、温度和“先判断”开关；非法输入会在弹层内提示</li>
+  </ul>
+  <p style="margin-top:12px"><b>状态演示</b></p>
+  <div class="demo-controls">
+    <button type="button" class="demo-btn" data-demo="loading">加载态</button>
+    <button type="button" class="demo-btn" data-demo="error">错误态</button>
+    <button type="button" class="demo-btn" data-demo="normal">恢复建议</button>
+  </div>
+  <p style="margin-top:12px;color:#999">← 左边可以点：建议句、↻、⚙、× 和 ✦</p>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const chipSets = [
+    [
+      '我也超爱听周杰伦！你最近单曲循环哪首',
+      '天平座品味不会差，推荐首歌给我？',
+      '那必须的，你平时还喜欢听谁的歌',
+    ],
+    [
+      '巧了，我最近也在循环他的老歌',
+      '先别说我，你的私藏歌单交出来',
+      '哈哈被你猜中了，你也喜欢现场版吗',
+    ],
+  ];
+  let round = 0;
+  let refreshTimer = null;
+
+  function renderChips(items, state) {
+    const chips = $('chips');
+    chips.innerHTML = '';
+    items.forEach(text => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'sug-chip' + (state ? ' ' + state : '');
+      chip.textContent = text;
+      if (!state) {
+        chip.addEventListener('click', () => {
+          const input = $('inputBox');
+          input.textContent = text;
+          input.classList.add('filled');
+        });
+      } else if (state === 'error') {
+        chip.addEventListener('click', showLoading);
+      }
+      chips.appendChild(chip);
+    });
+    requestAnimationFrame(updateChipOverflow);
+  }
+
+  function updateChipOverflow() {
+    const wrap = document.querySelector('.chips-wrap');
+    if (!wrap) return;
+    const hasMore = wrap.scrollWidth > wrap.clientWidth + 4
+      && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 4;
+    wrap.classList.toggle('overflowing', hasMore);
+  }
+
+  function showLoading() {
+    clearTimeout(refreshTimer);
+    renderChips(['AI 正在生成建议…'], 'loading');
+    refreshTimer = setTimeout(() => {
+      round++;
+      renderChips(chipSets[round % chipSets.length]);
+    }, 800);
+  }
+
+  function openModal(view) {
+    const settings = view === 'settings';
+    $('modalLayer').classList.add('open');
+    $('pop').classList.toggle('open', settings);
+    $('roleCard').classList.toggle('open', !settings);
+    if (settings) {
+      $('formError').textContent = '';
+      $('formError').classList.remove('show');
+    } else {
+      document.querySelectorAll('[data-card-tab]').forEach(button => {
+        button.classList.toggle('active', button.dataset.cardTab === 'peer');
+      });
+      document.querySelectorAll('[data-card-pane]').forEach(pane => {
+        pane.classList.toggle('role-hidden', pane.dataset.cardPane !== 'peer');
+      });
+    }
+  }
+
+  function closeModal() {
+    $('modalLayer').classList.remove('open');
+    $('pop').classList.remove('open');
+    $('roleCard').classList.remove('open');
+  }
+
+  function togglePop() {
+    if ($('modalLayer').classList.contains('open') && $('pop').classList.contains('open')) {
+      closeModal();
+    } else {
+      openModal('settings');
+    }
+  }
+
+  function saveSettings() {
+    const error = $('formError');
+    const rawBaseUrl = $('baseUrl').value.trim();
+    const rawTemperature = $('temperature').value.trim();
+    const temperature = Number(rawTemperature);
+    let baseUrl;
+    try { baseUrl = new URL(rawBaseUrl); } catch (e) {
+      baseUrl = null;
+    }
+    if (!rawBaseUrl) {
+      error.textContent = 'Base URL 不能为空';
+    } else if (!baseUrl) {
+      error.textContent = 'Base URL 格式无效';
+    } else if (!['http:', 'https:'].includes(baseUrl.protocol)) {
+      error.textContent = 'Base URL 只支持 http 或 https';
+    } else if (!$('model').value.trim()) {
+      error.textContent = '模型名不能为空';
+    } else if (rawTemperature === '' || !Number.isFinite(temperature) || temperature < 0 || temperature > 1) {
+      error.textContent = '温度必须是 0~1 之间的数字';
+    } else {
+      error.textContent = '';
+      error.classList.remove('show');
+      closeModal();
+      $('insight').classList.toggle('hidden',
+        !$('insightEnabled').checked || $('sugBar').classList.contains('hidden'));
+      showLoading();
+      return;
+    }
+    error.classList.add('show');
+  }
+
+  $('refreshBtn').addEventListener('click', showLoading);
+  $('cardBtn').addEventListener('click', () => openModal('card'));
+  $('cfgBtn').addEventListener('click', togglePop);
+  $('modalLayer').addEventListener('click', event => {
+    if (event.target === event.currentTarget) closeModal();
+  });
+  $('popClose').addEventListener('click', closeModal);
+  $('roleClose').addEventListener('click', closeModal);
+  $('roleRefresh').addEventListener('click', () => {
+    const hint = $('roleCard').querySelector('.role-sub span:last-of-type');
+    hint.textContent = '正在重新分析…';
+    setTimeout(() => { hint.textContent = 'AI 推断 · 把握 82%'; }, 800);
+  });
+  $('aiCards').addEventListener('click', () => {
+    const hint = $('roleCard').querySelector('.role-sub span:last-of-type');
+    const status = $('roleCard').querySelector('.player-status');
+    hint.textContent = '正在提炼双卡…';
+    status.textContent = '正在从用户自己的消息中提炼主角卡…';
+    status.classList.remove('role-hidden');
+    setTimeout(() => {
+      hint.textContent = 'AI 已更新对方卡';
+      status.textContent = 'AI 已同时更新两张卡。';
+    }, 800);
+  });
+  $('roleCard').addEventListener('click', event => {
+    const tab = event.target.closest('[data-card-tab]');
+    if (tab) {
+      document.querySelectorAll('[data-card-tab]').forEach(button => {
+        button.classList.toggle('active', button === tab);
+      });
+      document.querySelectorAll('[data-card-pane]').forEach(pane => {
+        pane.classList.toggle('role-hidden', pane.dataset.cardPane !== tab.dataset.cardTab);
+      });
+      return;
+    }
+    if (event.target.closest('.player-save')) {
+      const status = $('roleCard').querySelector('.player-status');
+      status.textContent = '已保存。后续生成会使用这份主角档案。';
+      status.classList.remove('role-hidden');
+      return;
+    }
+    const exportButton = event.target.closest('[data-export]');
+    if (exportButton) {
+      const player = {};
+      $('roleCard').querySelectorAll('[data-player]').forEach(field => {
+        player[field.dataset.player] = field.value;
+      });
+      const peer = {
+        type: 'soul-peer-card', name: '草莓小云朵', stage: '拉扯',
+        basicInfo: ['匹配度 93%', 'ENTJ', '音乐爱好者', '共同点：风象星座'],
+        summary: '对方表面冷淡，实际在确认你是否重视这段关系。',
+        personalityTags: ['敏感', '慢热', '嘴硬心软'],
+        recentEvents: ['加班与情绪：你答应补偿一次约会'],
+        memory: { summary: '双方因晚归和被忽略产生拉扯，当前在缓和。', openLoops: ['补偿一次约会'] },
+      };
+      const target = exportButton.dataset.export;
+      let content;
+      let filename;
+      if (target.startsWith('player')) {
+        content = target.endsWith('json') ? JSON.stringify({ type: 'soul-player-card', profile: player }, null, 2)
+          : 'Soul 主角卡\n' + Object.entries(player).map(([key, value]) => key + '：' + value).join('\n');
+        filename = 'Soul主角卡.' + (target.endsWith('json') ? 'json' : 'txt');
+      } else {
+        content = target.endsWith('json') ? JSON.stringify(peer, null, 2)
+          : 'Soul 对方角色卡\n姓名：' + peer.name + '\n阶段：' + peer.stage + '\n性格：' + peer.summary;
+        filename = 'Soul对方角色卡.' + (target.endsWith('json') ? 'json' : 'txt');
+      }
+      const blob = new Blob([content], { type: target.endsWith('json') ? 'application/json' : 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeModal();
+  });
+  $('hideBtn').addEventListener('click', () => {
+    $('sugBar').classList.add('hidden');
+    $('insight').classList.add('hidden');
+    $('miniBtn').classList.add('show');
+  });
+  $('miniBtn').addEventListener('click', () => {
+    $('sugBar').classList.remove('hidden');
+    $('insight').classList.remove('hidden');
+    $('miniBtn').classList.remove('show');
+    showLoading();
+  });
+  $('saveBtn').addEventListener('click', saveSettings);
+
+  document.querySelectorAll('[data-demo]').forEach(button => {
+    button.addEventListener('click', () => {
+      clearTimeout(refreshTimer);
+      const mode = button.dataset.demo;
+      if (mode === 'loading') showLoading();
+      else if (mode === 'error') renderChips(['生成失败（点击重试）'], 'error');
+      else renderChips(chipSets[round % chipSets.length]);
+    });
+  });
+
+  document.querySelector('.chips-wrap').addEventListener('scroll', updateChipOverflow, { passive: true });
+  window.addEventListener('resize', updateChipOverflow);
+  renderChips(chipSets[0]);
+</script>
+</body>
+</html>

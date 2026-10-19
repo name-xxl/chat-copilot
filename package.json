@@ -1,0 +1,14 @@
+{
+  "name": "soul-ai-chat",
+  "private": true,
+  "type": "module",
+  "version": "1.8.0",
+  "description": "Soul 网页版 AI 聊天助手（油猴脚本），源码在 src/，构建产物为单文件 soul-ai-chat.user.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
